@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #071014;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(180deg, rgba(18, 33, 39, .94), rgba(7, 16, 20, 1) 330px),
+    #071014;
+  color: #e6f0ed;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+:root[data-theme="light"] body {
+  background: #f4f7f8;
+  color: #071014;
+}
+
+:root[data-theme="light"] .bg-ink,
+:root[data-theme="light"] .bg-ink\/75 {
+  background-color: rgba(244, 247, 248, .9);
+}
+
+:root[data-theme="light"] .bg-panel,
+:root[data-theme="light"] .bg-panelSoft {
+  background-color: #ffffff;
+}
+
+:root[data-theme="light"] .border-line {
+  border-color: #d6e0e4;
+}
+
+:root[data-theme="light"] .text-white,
+:root[data-theme="light"] .text-slate-100,
+:root[data-theme="light"] .text-slate-200,
+:root[data-theme="light"] .text-slate-300 {
+  color: #102027;
+}
+
+:root[data-theme="light"] .text-slate-400,
+:root[data-theme="light"] .text-slate-500 {
+  color: #5f727a;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid #44c7d8;
+  outline-offset: 2px;
+}
+
+.scrollbar-thin {
+  scrollbar-color: #31464e #0d181d;
+  scrollbar-width: thin;
+}
