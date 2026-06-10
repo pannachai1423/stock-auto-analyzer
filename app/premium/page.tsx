@@ -12,6 +12,8 @@ const FREE = [
   "🎀 Hearts, stars, bows & Mochi stickers",
   "📖 Scrapbook & memory timeline",
   "⏳ Time capsules",
+  "🎬 GIF memory movies",
+  "📤 Instant sharing",
   "⬇️ Unlimited downloads"
 ];
 
@@ -20,7 +22,7 @@ const PREMIUM = [
   "🖼️ AI Frame Generator — birthdays, graduations, girls' trips",
   "🌌 AI Backgrounds — cherry blossom parks, cozy cafés, starry skies",
   "💞 Long Distance Mode — shared booths across cities",
-  "🎬 Animated memory movies — GIFs, Reels & TikToks",
+  "🎬 Cinematic memory movies — Reels & TikTok exports",
   "👗 Rare Mochi Dino costumes & seasonal themes"
 ];
 

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import MochiDino from "./MochiDino";
 import { mochiToast } from "./MochiToaster";
 import { MOCHI_LINES } from "@/lib/mochi";
+import { shareImage } from "@/lib/share";
 import { CATEGORIES, categoryById } from "@/lib/categories";
 import {
   ACHIEVEMENTS,
@@ -64,6 +65,14 @@ export default function ScrapbookView() {
     a.href = m.stripDataUrl;
     a.download = `dear-memory-${m.title.replace(/\s+/g, "-").toLowerCase()}.jpg`;
     a.click();
+  };
+
+  const share = async (m: Memory) => {
+    const shared = await shareImage(m.stripDataUrl, "dear-memory.jpg", `Dear Memory — ${m.title} 💖`);
+    if (!shared) {
+      download(m);
+      mochiToast("Sharing isn't supported here", "So Mochi downloaded it for you instead!", "💌");
+    }
   };
 
   if (!ready) {
@@ -218,6 +227,9 @@ export default function ScrapbookView() {
                     </button>
                     <button onClick={() => download(open)} className="btn-cloud !px-5 !py-2 !text-sm">
                       ⬇️ Download
+                    </button>
+                    <button onClick={() => share(open)} className="btn-cloud !px-5 !py-2 !text-sm">
+                      📤 Share
                     </button>
                     <button
                       onClick={() => remove(open)}

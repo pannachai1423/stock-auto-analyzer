@@ -32,6 +32,10 @@ In the app, Mochi:
 | 7 real-time filters (Korean Beauty, Soft Skin, Dreamy Glow, Fairy Glow, Vintage Film, Kawaii Pink, Anime Style) | ✅ |
 | Drag-and-drop decoration — hearts, stars, bows, flowers, official Mochi stickers, titles, date stamps, 6 frame colors | ✅ |
 | Strip download (composited keepsake JPEG) | ✅ |
+| 🎬 GIF memory movies — the strip becomes a looping mini-film | ✅ |
+| 🖼️ Build strips from gallery photos (no camera needed) | ✅ |
+| 📤 One-tap sharing via Web Share (Instagram, LINE, TikTok on mobile) | ✅ |
+| 🔔 Cute synthesized sounds — countdown ticks, shutter, save chime (mutable) | ✅ |
 | Scrapbook mode — notes, chapters by category, treasured-diary layout | ✅ |
 | Memory timeline — months blooming down a pastel stem | ✅ |
 | Time capsules — seal letters for 6 months / 1 year / 5 years, animated envelope reveal | ✅ |
@@ -47,7 +51,7 @@ needed.
 
 - **AI studio** — sticker generator, frame generator, background generator
 - **Long Distance Mode** — shared booths over WebRTC
-- **Animated memory movies** — GIF / Reel / TikTok export
+- **Cinematic memory movies** — Reel / TikTok video export (GIF already works!)
 - **Premium** — Stripe checkout, exclusive themes, Mochi costumes
 - **Accounts & sync** — Supabase + Cloudinary storage
 

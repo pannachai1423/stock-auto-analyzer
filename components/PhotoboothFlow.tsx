@@ -12,6 +12,9 @@ import { FILTERS, FRAMES, filterById, frameById } from "@/lib/filters";
 import { CATEGORIES } from "@/lib/categories";
 import { STICKERS, stickerByKey } from "@/lib/stickers";
 import { composeStrip, captureFrame, STRIP, stripHeight } from "@/lib/strip";
+import { composeGif } from "@/lib/gif";
+import { shareImage } from "@/lib/share";
+import { sfx, isMuted, setMuted } from "@/lib/sounds";
 import { loadMemories, saveMemory, newId, unlockAchievement } from "@/lib/storage";
 import type { CategoryId, FilterId, FrameId, Memory, PlacedSticker } from "@/lib/types";
 
@@ -71,10 +74,17 @@ export default function PhotoboothFlow() {
   const [saving, setSaving] = useState(false);
   const [finalStrip, setFinalStrip] = useState<string | null>(null);
   const [savedMemory, setSavedMemory] = useState<Memory | null>(null);
+  const [muted, setMutedState] = useState(false);
+  const [gifBusy, setGifBusy] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const triedFilters = useRef<Set<FilterId>>(new Set());
+
+  useEffect(() => {
+    setMutedState(isMuted());
+  }, []);
 
   const filterInfo = filterById(filter);
   const frameInfo = frameById(frame);
@@ -132,14 +142,17 @@ export default function PhotoboothFlow() {
       new Promise<void>((resolve) => {
         let n = COUNTDOWN_SECONDS;
         setCountdown(n);
+        sfx.tick();
         const tick = window.setInterval(() => {
           n -= 1;
           if (n <= 0) {
             window.clearInterval(tick);
             setCountdown(null);
+            sfx.go();
             resolve();
           } else {
             setCountdown(n);
+            sfx.tick();
           }
         }, 900);
       }),
@@ -152,6 +165,7 @@ export default function PhotoboothFlow() {
       for (const slot of slots) {
         await runCountdown();
         setFlashing(true);
+        sfx.shutter();
         const shot = snapOne();
         window.setTimeout(() => setFlashing(false), 500);
         setPhotos((prev) => {
@@ -184,6 +198,47 @@ export default function PhotoboothFlow() {
 
   const allCaptured = photos.length === layout && photos.every(Boolean);
 
+  /** lets users build a strip from gallery photos — no camera needed */
+  const onFilesPicked = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const downscale = (file: File) =>
+      new Promise<string>((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new window.Image();
+        img.onload = () => {
+          const w = Math.min(img.width, 960);
+          const h = Math.round(w * (img.height / img.width));
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL("image/jpeg", 0.9));
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+
+    const picked = await Promise.all(
+      Array.from(files)
+        .slice(0, layout)
+        .map((f) => downscale(f).catch(() => ""))
+    );
+    setPhotos((prev) => {
+      const next = prev.length === layout ? [...prev] : Array(layout).fill("");
+      let p = 0;
+      // fill empty slots first, then overwrite from the top
+      for (let i = 0; i < layout && p < picked.length; i++) {
+        if (!next[i] && picked[p]) next[i] = picked[p++];
+      }
+      for (let i = 0; i < layout && p < picked.length; i++) {
+        if (picked[p]) next[i] = picked[p++];
+      }
+      return next;
+    });
+    sfx.pop();
+  };
+
   /* ---------------- decorate ---------------- */
 
   const stripW = STRIP.width;
@@ -202,6 +257,7 @@ export default function PhotoboothFlow() {
     };
     setStickers((s) => [...s, placed]);
     setSelectedSticker(placed.id);
+    sfx.pop();
     if (stickers.length + 1 >= 5) {
       const ach = unlockAchievement("decorator");
       if (ach) mochiToast(ach.label, ach.description, ach.emoji);
@@ -284,6 +340,7 @@ export default function PhotoboothFlow() {
       setFinalStrip(strip);
       setSavedMemory(ok ? memory : null);
       setStage("done");
+      sfx.chime();
       if (ok) {
         const count = loadMemories().length;
         const firsts: Array<[number, string]> = [
@@ -319,6 +376,40 @@ export default function PhotoboothFlow() {
     a.href = finalStrip;
     a.download = `dear-memory-${new Date().toISOString().slice(0, 10)}.jpg`;
     a.click();
+  };
+
+  const makeGif = async () => {
+    if (gifBusy) return;
+    setGifBusy(true);
+    try {
+      const blob = await composeGif({
+        photos: photos.slice(0, layout),
+        filter,
+        frame,
+        title: title.trim(),
+        dateLabel
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dear-memory-${new Date().toISOString().slice(0, 10)}.gif`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+      mochiToast("Your memory movie is ready!", "A little GIF to share everywhere ✨", "🎬");
+    } catch {
+      mochiToast("Oh no, the GIF got shy…", "Please try again!", "🥺");
+    } finally {
+      setGifBusy(false);
+    }
+  };
+
+  const share = async () => {
+    if (!finalStrip) return;
+    const shared = await shareImage(finalStrip, "dear-memory.jpg", "Dear Memory 💖");
+    if (!shared) {
+      download();
+      mochiToast("Sharing isn't supported here", "So Mochi downloaded it for you instead!", "💌");
+    }
   };
 
   /* ================= render ================= */
@@ -489,12 +580,41 @@ export default function PhotoboothFlow() {
             {/* controls */}
             <div className="flex flex-wrap items-center justify-center gap-3">
               <button
+                onClick={() => {
+                  const next = !muted;
+                  setMuted(next);
+                  setMutedState(next);
+                }}
+                title={muted ? "Unmute cute sounds" : "Mute sounds"}
+                className="btn-cloud !px-4 !py-2.5 !text-sm"
+              >
+                {muted ? "🔕" : "🔔"}
+              </button>
+              <button
                 onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
                 disabled={shooting || demoMode}
                 className="btn-cloud !px-5 !py-2.5 !text-sm disabled:opacity-40"
               >
                 🔄 Flip camera
               </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={shooting}
+                className="btn-cloud !px-5 !py-2.5 !text-sm disabled:opacity-40"
+              >
+                🖼️ From gallery
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  onFilesPicked(e.target.files);
+                  e.target.value = "";
+                }}
+              />
               <button
                 onClick={startShoot}
                 disabled={shooting || (!demoMode && !!cameraError)}
@@ -746,6 +866,12 @@ export default function PhotoboothFlow() {
             <div className="flex flex-wrap justify-center gap-3">
               <button onClick={download} className="btn-candy">
                 ⬇️ Download
+              </button>
+              <button onClick={makeGif} disabled={gifBusy} className="btn-candy disabled:opacity-60">
+                {gifBusy ? "🎬 Filming…" : "🎬 Memory movie (GIF)"}
+              </button>
+              <button onClick={share} className="btn-cloud">
+                📤 Share
               </button>
               <Link href="/scrapbook" className="btn-cloud">
                 📖 Open scrapbook
