@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import MochiDino from "./MochiDino";
-import { MOCHI_LINES } from "@/lib/mochi";
+import { useLang } from "@/lib/i18n";
 import { isReturningVisitor } from "@/lib/storage";
 
 export default function HomeHero() {
-  const [greeting, setGreeting] = useState<string>(MOCHI_LINES.greeting);
+  const { t } = useLang();
+  const [returning, setReturning] = useState(false);
 
   useEffect(() => {
-    if (isReturningVisitor()) setGreeting(MOCHI_LINES.welcomeBack);
+    if (isReturningVisitor()) setReturning(true);
   }, []);
+
+  const greeting = returning ? t.mochi.welcomeBack : t.mochi.greeting;
 
   return (
     <section className="relative flex flex-col-reverse items-center gap-10 py-10 md:flex-row md:justify-between md:py-16">
@@ -23,7 +26,7 @@ export default function HomeHero() {
           transition={{ delay: 0.1 }}
           className="chip mb-5"
         >
-          🦕 Mochi Dino is waiting for you
+          {t.hero.chip}
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 18 }}
@@ -31,7 +34,8 @@ export default function HomeHero() {
           transition={{ delay: 0.2 }}
           className="font-display text-4xl leading-tight sm:text-5xl md:text-6xl"
         >
-          Some moments <span className="title-gradient">only happen once.</span>
+          {t.hero.title1}
+          <span className="title-gradient">{t.hero.titleHi}</span>
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 18 }}
@@ -39,7 +43,7 @@ export default function HomeHero() {
           transition={{ delay: 0.32 }}
           className="mt-5 text-lg text-cocoaSoft"
         >
-          Let&apos;s keep this one forever.
+          {t.hero.subtitle}
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 18 }}
@@ -48,10 +52,10 @@ export default function HomeHero() {
           className="mt-8 flex flex-wrap justify-center gap-4 md:justify-start"
         >
           <Link href="/photobooth" className="btn-candy">
-            📸 Save A Memory
+            {t.hero.ctaSave}
           </Link>
           <Link href="/scrapbook" className="btn-cloud">
-            💖 Explore Memories
+            {t.hero.ctaExplore}
           </Link>
         </motion.div>
       </div>

@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Baloo_2, Quicksand } from "next/font/google";
+import { Baloo_2, Quicksand, Mali, Noto_Sans_Thai_Looped } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FloatingBackground from "@/components/FloatingBackground";
 import MochiToaster from "@/components/MochiToaster";
+import { LangProvider } from "@/lib/i18n";
 
 const display = Baloo_2({
   subsets: ["latin"],
@@ -16,6 +17,18 @@ const body = Quicksand({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-body"
+});
+
+const displayThai = Mali({
+  subsets: ["thai", "latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display-thai"
+});
+
+const bodyThai = Noto_Sans_Thai_Looped({
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body-thai"
 });
 
 export const metadata: Metadata = {
@@ -40,13 +53,18 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html
+      lang="en"
+      className={`${display.variable} ${body.variable} ${displayThai.variable} ${bodyThai.variable}`}
+    >
       <body>
-        <FloatingBackground />
-        <Navbar />
-        <main className="relative z-10 mx-auto w-[min(1080px,94vw)] pt-8">{children}</main>
-        <Footer />
-        <MochiToaster />
+        <LangProvider>
+          <FloatingBackground />
+          <Navbar />
+          <main className="relative z-10 mx-auto w-[min(1080px,94vw)] pt-8">{children}</main>
+          <Footer />
+          <MochiToaster />
+        </LangProvider>
       </body>
     </html>
   );

@@ -3,18 +3,20 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-
-const LINKS = [
-  { href: "/", label: "Home", emoji: "🏡" },
-  { href: "/photobooth", label: "Photobooth", emoji: "📸" },
-  { href: "/scrapbook", label: "Scrapbook", emoji: "📖" },
-  { href: "/timeline", label: "Timeline", emoji: "🌸" },
-  { href: "/capsule", label: "Time Capsule", emoji: "⏳" },
-  { href: "/premium", label: "Premium", emoji: "👑" }
-];
+import { useLang } from "@/lib/i18n";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { lang, setLang, t } = useLang();
+
+  const links = [
+    { href: "/", label: t.nav.home, emoji: "🏡" },
+    { href: "/photobooth", label: t.nav.photobooth, emoji: "📸" },
+    { href: "/scrapbook", label: t.nav.scrapbook, emoji: "📖" },
+    { href: "/timeline", label: t.nav.timeline, emoji: "🌸" },
+    { href: "/capsule", label: t.nav.capsule, emoji: "⏳" },
+    { href: "/premium", label: t.nav.premium, emoji: "👑" }
+  ];
 
   return (
     <header className="sticky top-3 z-40 mx-auto w-[min(1080px,94vw)]">
@@ -29,7 +31,7 @@ export default function Navbar() {
         </Link>
 
         <div className="flex flex-wrap items-center gap-1">
-          {LINKS.map((l) => {
+          {links.map((l) => {
             const active = pathname === l.href;
             return (
               <Link
@@ -48,6 +50,13 @@ export default function Navbar() {
               </Link>
             );
           })}
+          <button
+            onClick={() => setLang(lang === "en" ? "th" : "en")}
+            title={lang === "en" ? "เปลี่ยนเป็นภาษาไทย" : "Switch to English"}
+            className="ml-1 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-sm font-bold text-cocoa shadow-plush transition-all hover:scale-105 hover:bg-white"
+          >
+            {lang === "en" ? "🇹🇭 ไทย" : "🌏 EN"}
+          </button>
         </div>
       </nav>
     </header>

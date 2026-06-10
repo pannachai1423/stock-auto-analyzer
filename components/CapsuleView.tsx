@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import MochiDino from "./MochiDino";
 import { mochiToast } from "./MochiToaster";
-import { MOCHI_LINES } from "@/lib/mochi";
+import { useLang, type Dict } from "@/lib/i18n";
 import {
   deleteCapsule,
   loadCapsules,
@@ -14,69 +14,73 @@ import {
 } from "@/lib/storage";
 import type { TimeCapsule } from "@/lib/types";
 
-const DURATIONS = [
-  { label: "1 minute (just to try ✨)", ms: 60 * 1000 },
-  { label: "6 months", ms: 182 * 24 * 3600 * 1000 },
-  { label: "1 year", ms: 365 * 24 * 3600 * 1000 },
-  { label: "5 years", ms: 5 * 365 * 24 * 3600 * 1000 }
+const DURATION_MS = [
+  60 * 1000, // 1 minute, just to try
+  182 * 24 * 3600 * 1000, // 6 months
+  365 * 24 * 3600 * 1000, // 1 year
+  5 * 365 * 24 * 3600 * 1000 // 5 years
 ];
 
-function remainingLabel(opensAt: number, now: number): string {
+function remainingLabel(opensAt: number, now: number, t: Dict): string {
   const ms = opensAt - now;
-  if (ms <= 0) return "Ready to open!";
+  if (ms <= 0) return t.capsule.ready;
   const mins = Math.ceil(ms / 60000);
-  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} to go`;
+  if (mins < 60) return t.capsule.minutesToGo(mins);
   const hours = Math.ceil(ms / 3600000);
-  if (hours < 48) return `${hours} hours to go`;
+  if (hours < 48) return t.capsule.hoursToGo(hours);
   const days = Math.ceil(ms / 86400000);
-  if (days < 60) return `${days} days to go`;
+  if (days < 60) return t.capsule.daysToGo(days);
   const months = Math.round(days / 30.4);
-  if (months < 24) return `${months} months to go`;
-  return `${(days / 365).toFixed(1)} years to go`;
+  if (months < 24) return t.capsule.monthsToGo(months);
+  return t.capsule.yearsToGo((days / 365).toFixed(1));
 }
 
 export default function CapsuleView() {
+  const { t } = useLang();
   const [capsules, setCapsules] = useState<TimeCapsule[]>([]);
   const [ready, setReady] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const [message, setMessage] = useState("");
   const [from, setFrom] = useState("");
-  const [durationMs, setDurationMs] = useState(DURATIONS[1].ms);
+  const [durationIdx, setDurationIdx] = useState(1);
   const [reading, setReading] = useState<TimeCapsule | null>(null);
   const [envelopeOpen, setEnvelopeOpen] = useState(false);
 
   useEffect(() => {
     setCapsules(loadCapsules());
     setReady(true);
-    const t = window.setInterval(() => setNow(Date.now()), 15000);
-    return () => window.clearInterval(t);
+    const timer = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const seal = () => {
     if (!message.trim()) {
-      mochiToast("Write a little something first!", "Even one sentence is a treasure.", "💌");
+      mochiToast(t.capsule.emptyTitle, t.capsule.emptyBody, "💌");
       return;
     }
     const capsule: TimeCapsule = {
       id: newId(),
       createdAt: Date.now(),
-      opensAt: Date.now() + durationMs,
+      opensAt: Date.now() + DURATION_MS[durationIdx],
       message: message.trim(),
-      from: from.trim() || "past you",
+      from: from.trim() || t.capsule.fromDefault,
       opened: false
     };
     saveCapsule(capsule);
     setCapsules(loadCapsules());
     setMessage("");
-    mochiToast("Sealed with love!", MOCHI_LINES.capsuleSealed, "⏳");
+    mochiToast(t.capsule.sealedToastTitle, t.capsule.sealedToastBody, "⏳");
     const ach = unlockAchievement("first-capsule");
-    if (ach) mochiToast(ach.label, ach.description, ach.emoji);
+    if (ach) {
+      const tr = t.achievements["first-capsule"];
+      mochiToast(tr.label, tr.description, ach.emoji);
+    }
   };
 
   const openCapsule = (c: TimeCapsule) => {
     if (c.opensAt > now) {
-      mochiToast(MOCHI_LINES.capsuleWaiting, remainingLabel(c.opensAt, now), "🤫");
+      mochiToast(t.mochi.capsuleWaiting, remainingLabel(c.opensAt, now, t), "🤫");
       return;
     }
     setReading(c);
@@ -86,13 +90,16 @@ export default function CapsuleView() {
       saveCapsule({ ...c, opened: true });
       setCapsules(loadCapsules());
       const ach = unlockAchievement("capsule-opened");
-      if (ach) mochiToast(ach.label, ach.description, ach.emoji);
+      if (ach) {
+        const tr = t.achievements["capsule-opened"];
+        mochiToast(tr.label, tr.description, ach.emoji);
+      }
     }
   };
 
   if (!ready) {
     return (
-      <p className="py-20 text-center font-display text-xl text-cocoaSoft">{MOCHI_LINES.loading}</p>
+      <p className="py-20 text-center font-display text-xl text-cocoaSoft">{t.mochi.loading}</p>
     );
   }
 
@@ -100,12 +107,10 @@ export default function CapsuleView() {
     <div className="pb-8">
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <h1 className="font-display text-4xl">
-          Time <span className="title-gradient">Capsule</span> ⏳
+          {t.capsule.title1}
+          <span className="title-gradient">{t.capsule.titleHi}</span> ⏳
         </h1>
-        <p className="max-w-md text-sm text-cocoaSoft">
-          Write a letter to future you. Seal it. Forget it. Then one day… a hello
-          from the past.
-        </p>
+        <p className="max-w-md text-sm text-cocoaSoft">{t.capsule.sub}</p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -114,57 +119,54 @@ export default function CapsuleView() {
           <div className="mb-4 flex items-center gap-3">
             <MochiDino pose="curious" size={80} float={false} interactive={false} />
             <p className="glass-strong rounded-3xl px-4 py-2 font-display text-sm shadow-bubble">
-              What would you tell future you? 💭
+              {t.mochi.capsulePrompt}
             </p>
           </div>
-          <label className="font-display text-sm">Your letter 💌</label>
+          <label className="font-display text-sm">{t.capsule.letterLabel}</label>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value.slice(0, 1200))}
             rows={6}
-            placeholder="Dear future me… right now, life feels like…"
+            placeholder={t.capsule.letterPh}
             className="mt-1.5 w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-cocoaSoft/60 focus:ring-2 focus:ring-lav-300"
           />
-          <label className="mt-4 block font-display text-sm">From</label>
+          <label className="mt-4 block font-display text-sm">{t.capsule.fromLabel}</label>
           <input
             value={from}
             onChange={(e) => setFrom(e.target.value.slice(0, 40))}
-            placeholder="your name (or a secret nickname)"
+            placeholder={t.capsule.fromPh}
             className="mt-1.5 w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm outline-none placeholder:text-cocoaSoft/60 focus:ring-2 focus:ring-lav-300"
           />
-          <label className="mt-4 block font-display text-sm">Open it in…</label>
+          <label className="mt-4 block font-display text-sm">{t.capsule.openIn}</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {DURATIONS.map((d) => (
+            {t.capsule.durations.map((label, i) => (
               <button
-                key={d.label}
-                onClick={() => setDurationMs(d.ms)}
+                key={label}
+                onClick={() => setDurationIdx(i)}
                 className={`rounded-2xl border px-3 py-2.5 text-xs font-semibold transition-all ${
-                  durationMs === d.ms
+                  durationIdx === i
                     ? "border-lav-400 bg-lav-100 text-[#71619e] shadow-plush scale-[1.02]"
                     : "border-white/70 bg-white/50 hover:bg-white/80"
                 }`}
               >
-                {d.label}
+                {label}
               </button>
             ))}
           </div>
           <button onClick={seal} className="btn-candy mt-6 w-full">
-            ⏳ Seal it with love
+            {t.capsule.seal}
           </button>
         </div>
 
         {/* sealed capsules */}
         <div>
           <h2 className="mb-4 text-center font-display text-xl lg:text-left">
-            Your sealed letters ({capsules.length})
+            {t.capsule.yourLetters} ({capsules.length})
           </h2>
           {capsules.length === 0 ? (
             <div className="plush-card flex flex-col items-center gap-3 p-8 text-center">
               <span className="text-4xl">🫙</span>
-              <p className="text-sm text-cocoaSoft">
-                No capsules yet — your first letter to the future is waiting to be
-                written.
-              </p>
+              <p className="text-sm text-cocoaSoft">{t.capsule.none}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -183,15 +185,15 @@ export default function CapsuleView() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-display text-sm">
-                        From {c.from} ·{" "}
-                        {new Date(c.createdAt).toLocaleDateString("en-US", {
+                        {t.capsule.fromWord} {c.from} ·{" "}
+                        {new Date(c.createdAt).toLocaleDateString(t.dateLocale, {
                           month: "short",
                           day: "numeric",
                           year: "numeric"
                         })}
                       </p>
                       <p className="text-xs text-cocoaSoft">
-                        {c.opened ? "Opened — read it again anytime" : remainingLabel(c.opensAt, now)}
+                        {c.opened ? t.capsule.openedHint : remainingLabel(c.opensAt, now, t)}
                       </p>
                     </div>
                     <button
@@ -202,17 +204,17 @@ export default function CapsuleView() {
                           : "bg-white/70 text-cocoaSoft"
                       }`}
                     >
-                      {c.opened ? "Read" : openable ? "Open!" : "Sealed"}
+                      {c.opened ? t.capsule.read : openable ? t.capsule.openNow : t.capsule.sealedBtn}
                     </button>
                     <button
                       onClick={() => {
-                        if (window.confirm("Throw this capsule away forever? 🥺")) {
+                        if (window.confirm(t.capsule.deleteConfirm)) {
                           deleteCapsule(c.id);
                           setCapsules(loadCapsules());
                         }
                       }}
                       className="shrink-0 text-sm opacity-40 transition-opacity hover:opacity-100"
-                      title="Delete capsule"
+                      title={t.capsule.deleteTip}
                     >
                       🗑️
                     </button>
@@ -256,7 +258,7 @@ export default function CapsuleView() {
                 className="glass-strong relative z-20 rounded-squish p-8 shadow-plushLg"
               >
                 <div className="mb-4 flex items-center justify-between">
-                  <p className="chip text-xs">💌 {MOCHI_LINES.capsuleOpen}</p>
+                  <p className="chip text-xs">💌 {t.mochi.capsuleOpen}</p>
                   <button
                     onClick={() => setReading(null)}
                     className="rounded-full bg-white/80 px-3 py-1 text-sm shadow-plush transition-transform hover:scale-110"
@@ -270,8 +272,8 @@ export default function CapsuleView() {
                   transition={{ delay: 0.9, duration: 0.8 }}
                 >
                   <p className="text-xs text-cocoaSoft">
-                    Sealed on{" "}
-                    {new Date(reading.createdAt).toLocaleDateString("en-US", {
+                    {t.capsule.sealedOn}{" "}
+                    {new Date(reading.createdAt).toLocaleDateString(t.dateLocale, {
                       weekday: "long",
                       year: "numeric",
                       month: "long",

@@ -44,8 +44,8 @@ const config: Config = {
         cocoaSoft: "#9a8a82"
       },
       fontFamily: {
-        display: ["var(--font-display)", "cursive"],
-        body: ["var(--font-body)", "sans-serif"]
+        display: ["var(--font-display)", "var(--font-display-thai)", "cursive"],
+        body: ["var(--font-body)", "var(--font-body-thai)", "sans-serif"]
       },
       boxShadow: {
         plush: "0 10px 30px -8px rgba(187, 148, 132, 0.25)",

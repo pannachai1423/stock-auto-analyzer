@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import MochiDino from "./MochiDino";
 import { mochiToast } from "./MochiToaster";
-import { MOCHI_LINES } from "@/lib/mochi";
+import { useLang } from "@/lib/i18n";
 import { shareImage } from "@/lib/share";
 import { CATEGORIES, categoryById } from "@/lib/categories";
 import {
@@ -18,6 +18,7 @@ import {
 import type { CategoryId, Memory } from "@/lib/types";
 
 export default function ScrapbookView() {
+  const { t } = useLang();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [ready, setReady] = useState(false);
   const [chapter, setChapter] = useState<CategoryId | "all">("all");
@@ -50,11 +51,11 @@ export default function ScrapbookView() {
     if (!open) return;
     updateMemory(open.id, { note });
     setMemories(loadMemories());
-    mochiToast("Note saved!", "Future you will love reading this.", "💌");
+    mochiToast(t.scrapbook.noteSavedTitle, t.scrapbook.noteSavedBody, "💌");
   };
 
   const remove = (m: Memory) => {
-    if (!window.confirm("Let this memory go? Mochi will miss it… 🥺")) return;
+    if (!window.confirm(t.scrapbook.confirmDelete)) return;
     deleteMemory(m.id);
     setMemories(loadMemories());
     setOpen(null);
@@ -71,13 +72,13 @@ export default function ScrapbookView() {
     const shared = await shareImage(m.stripDataUrl, "dear-memory.jpg", `Dear Memory — ${m.title} 💖`);
     if (!shared) {
       download(m);
-      mochiToast("Sharing isn't supported here", "So Mochi downloaded it for you instead!", "💌");
+      mochiToast(t.booth.shareFailTitle, t.booth.shareFailBody, "💌");
     }
   };
 
   if (!ready) {
     return (
-      <p className="py-20 text-center font-display text-xl text-cocoaSoft">{MOCHI_LINES.loading}</p>
+      <p className="py-20 text-center font-display text-xl text-cocoaSoft">{t.mochi.loading}</p>
     );
   }
 
@@ -85,18 +86,17 @@ export default function ScrapbookView() {
     <div className="pb-8">
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <h1 className="font-display text-4xl">
-          Your <span className="title-gradient">Scrapbook</span> 📖
+          {t.scrapbook.title1}
+          <span className="title-gradient">{t.scrapbook.titleHi}</span> 📖
         </h1>
-        <p className="max-w-md text-sm text-cocoaSoft">
-          A treasured diary of every moment you decided to keep.
-        </p>
+        <p className="max-w-md text-sm text-cocoaSoft">{t.scrapbook.sub}</p>
       </div>
 
       {memories.length === 0 ? (
         <div className="flex flex-col items-center gap-6 py-10">
-          <MochiDino pose="curious" size={200} message={MOCHI_LINES.emptyState} />
+          <MochiDino pose="curious" size={200} message={t.mochi.emptyState} />
           <Link href="/photobooth" className="btn-candy">
-            📸 Save A Memory
+            {t.hero.ctaSave}
           </Link>
         </div>
       ) : (
@@ -109,7 +109,7 @@ export default function ScrapbookView() {
                 chapter === "all" ? "!bg-blossom-200/90 !text-[#a45a7c]" : ""
               }`}
             >
-              🌈 All ({memories.length})
+              {t.scrapbook.all} ({memories.length})
             </button>
             {chapters.map((c) => (
               <button
@@ -119,7 +119,7 @@ export default function ScrapbookView() {
                   chapter === c.id ? "!bg-blossom-200/90 !text-[#a45a7c]" : ""
                 }`}
               >
-                {c.emoji} {c.label}
+                {c.emoji} {t.categories[c.id].label}
               </button>
             ))}
           </div>
@@ -144,7 +144,7 @@ export default function ScrapbookView() {
                   {categoryById(m.category).emoji} {m.title}
                 </p>
                 <p className="text-center text-[11px] text-cocoaSoft">
-                  {new Date(m.createdAt).toLocaleDateString("en-US", {
+                  {new Date(m.createdAt).toLocaleDateString(t.dateLocale, {
                     month: "short",
                     day: "numeric",
                     year: "numeric"
@@ -158,10 +158,11 @@ export default function ScrapbookView() {
 
       {/* achievements shelf */}
       <section className="mt-14">
-        <h2 className="text-center font-display text-2xl">Mochi&apos;s little prizes 🏆</h2>
+        <h2 className="text-center font-display text-2xl">{t.scrapbook.prizes}</h2>
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {ACHIEVEMENTS.map((a) => {
             const got = unlocked.has(a.id);
+            const tr = t.achievements[a.id as keyof typeof t.achievements];
             return (
               <div
                 key={a.id}
@@ -170,8 +171,10 @@ export default function ScrapbookView() {
                 }`}
               >
                 <span className="text-2xl">{a.emoji}</span>
-                <p className="mt-1 font-display text-sm">{a.label}</p>
-                <p className="text-[11px] text-cocoaSoft">{got ? a.description : "Still waiting… ✨"}</p>
+                <p className="mt-1 font-display text-sm">{tr.label}</p>
+                <p className="text-[11px] text-cocoaSoft">
+                  {got ? tr.description : t.scrapbook.stillWaiting}
+                </p>
               </div>
             );
           })}
@@ -203,39 +206,41 @@ export default function ScrapbookView() {
                   className="mx-auto w-[200px] shrink-0 self-start rounded-2xl border-4 border-white shadow-plush"
                 />
                 <div className="flex-1">
-                  <p className="chip text-xs">{categoryById(open.category).emoji} {categoryById(open.category).label}</p>
+                  <p className="chip text-xs">
+                    {categoryById(open.category).emoji} {t.categories[open.category].label}
+                  </p>
                   <h3 className="mt-3 font-display text-2xl">{open.title}</h3>
                   <p className="text-xs text-cocoaSoft">
-                    {new Date(open.createdAt).toLocaleDateString("en-US", {
+                    {new Date(open.createdAt).toLocaleDateString(t.dateLocale, {
                       weekday: "long",
                       year: "numeric",
                       month: "long",
                       day: "numeric"
                     })}
                   </p>
-                  <label className="mt-4 block font-display text-sm">A note for future you 💌</label>
+                  <label className="mt-4 block font-display text-sm">{t.scrapbook.noteLabel}</label>
                   <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value.slice(0, 600))}
                     rows={5}
-                    placeholder="What made this moment special?"
+                    placeholder={t.scrapbook.notePh}
                     className="mt-1.5 w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-3 text-sm outline-none placeholder:text-cocoaSoft/60 focus:ring-2 focus:ring-blossom-300"
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button onClick={saveNote} className="btn-candy !px-5 !py-2 !text-sm">
-                      💌 Save note
+                      {t.scrapbook.saveNote}
                     </button>
                     <button onClick={() => download(open)} className="btn-cloud !px-5 !py-2 !text-sm">
-                      ⬇️ Download
+                      {t.scrapbook.download}
                     </button>
                     <button onClick={() => share(open)} className="btn-cloud !px-5 !py-2 !text-sm">
-                      📤 Share
+                      {t.scrapbook.share}
                     </button>
                     <button
                       onClick={() => remove(open)}
                       className="btn-cloud !px-5 !py-2 !text-sm hover:!bg-blossom-100"
                     >
-                      🥀 Let go
+                      {t.scrapbook.letGo}
                     </button>
                   </div>
                 </div>

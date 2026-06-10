@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import MochiDino from "./MochiDino";
-import { MOCHI_LINES } from "@/lib/mochi";
+import { useLang } from "@/lib/i18n";
 import { categoryById } from "@/lib/categories";
 import { loadMemories } from "@/lib/storage";
 import type { Memory } from "@/lib/types";
@@ -16,6 +16,7 @@ interface MonthGroup {
 }
 
 export default function TimelineView() {
+  const { t } = useLang();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [ready, setReady] = useState(false);
 
@@ -32,18 +33,18 @@ export default function TimelineView() {
       if (!map.has(key)) {
         map.set(key, {
           key,
-          label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+          label: d.toLocaleDateString(t.dateLocale, { month: "long", year: "numeric" }),
           memories: []
         });
       }
       map.get(key)!.memories.push(m);
     }
     return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
-  }, [memories]);
+  }, [memories, t.dateLocale]);
 
   if (!ready) {
     return (
-      <p className="py-20 text-center font-display text-xl text-cocoaSoft">{MOCHI_LINES.loading}</p>
+      <p className="py-20 text-center font-display text-xl text-cocoaSoft">{t.mochi.loading}</p>
     );
   }
 
@@ -51,18 +52,17 @@ export default function TimelineView() {
     <div className="pb-8">
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <h1 className="font-display text-4xl">
-          Memory <span className="title-gradient">Timeline</span> 🌸
+          {t.timeline.title1}
+          <span className="title-gradient">{t.timeline.titleHi}</span> 🌸
         </h1>
-        <p className="max-w-md text-sm text-cocoaSoft">
-          Your story, blooming month by month.
-        </p>
+        <p className="max-w-md text-sm text-cocoaSoft">{t.timeline.sub}</p>
       </div>
 
       {groups.length === 0 ? (
         <div className="flex flex-col items-center gap-6 py-10">
-          <MochiDino pose="curious" size={200} message={MOCHI_LINES.emptyState} />
+          <MochiDino pose="curious" size={200} message={t.mochi.emptyState} />
           <Link href="/photobooth" className="btn-candy">
-            📸 Save A Memory
+            {t.hero.ctaSave}
           </Link>
         </div>
       ) : (
@@ -105,7 +105,7 @@ export default function TimelineView() {
                         {categoryById(m.category).emoji} {m.title}
                       </p>
                       <p className="text-center text-[10px] text-cocoaSoft">
-                        {new Date(m.createdAt).toLocaleDateString("en-US", {
+                        {new Date(m.createdAt).toLocaleDateString(t.dateLocale, {
                           month: "short",
                           day: "numeric"
                         })}
@@ -117,7 +117,7 @@ export default function TimelineView() {
             ))}
           </div>
           <div className="mt-14 flex flex-col items-center gap-2">
-            <MochiDino pose="happy" size={120} float message="Look how far we've come! 🥹" />
+            <MochiDino pose="happy" size={120} float message={t.mochi.timelineEnd} />
           </div>
         </div>
       )}

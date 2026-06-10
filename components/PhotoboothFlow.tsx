@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import MochiDino from "./MochiDino";
 import { mochiToast } from "./MochiToaster";
-import { MOCHI_LINES } from "@/lib/mochi";
+import { useLang } from "@/lib/i18n";
 import { FILTERS, FRAMES, filterById, frameById } from "@/lib/filters";
 import { CATEGORIES } from "@/lib/categories";
 import { STICKERS, stickerByKey } from "@/lib/stickers";
@@ -50,6 +50,7 @@ function demoFrame(index: number): string {
 }
 
 export default function PhotoboothFlow() {
+  const { t } = useLang();
   const params = useSearchParams();
   const initialCategory = (params.get("category") as CategoryId) || "everyday";
 
@@ -59,7 +60,7 @@ export default function PhotoboothFlow() {
   const [filter, setFilter] = useState<FilterId>("korean-beauty");
   const [frame, setFrame] = useState<FrameId>("cream");
   const [facing, setFacing] = useState<"user" | "environment">("user");
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
 
   const [photos, setPhotos] = useState<string[]>([]);
@@ -100,7 +101,7 @@ export default function PhotoboothFlow() {
   const startCamera = useCallback(
     async (mode: "user" | "environment") => {
       stopCamera();
-      setCameraError(null);
+      setCameraError(false);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 960 } },
@@ -113,9 +114,7 @@ export default function PhotoboothFlow() {
         }
         setDemoMode(false);
       } catch {
-        setCameraError(
-          "Mochi couldn't find your camera 🥺 You can allow camera access and retry, or play in demo mode!"
-        );
+        setCameraError(true);
       }
     },
     [stopCamera]
@@ -260,7 +259,10 @@ export default function PhotoboothFlow() {
     sfx.pop();
     if (stickers.length + 1 >= 5) {
       const ach = unlockAchievement("decorator");
-      if (ach) mochiToast(ach.label, ach.description, ach.emoji);
+      if (ach) {
+        const tr = t.achievements.decorator;
+        mochiToast(tr.label, tr.description, ach.emoji);
+      }
     }
   };
 
@@ -307,8 +309,12 @@ export default function PhotoboothFlow() {
 
   const dateLabel = useMemo(
     () =>
-      new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-    []
+      new Date().toLocaleDateString(t.dateLocale, {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }),
+    [t.dateLocale]
   );
 
   /* ---------------- save ---------------- */
@@ -328,7 +334,7 @@ export default function PhotoboothFlow() {
       const memory: Memory = {
         id: newId(),
         createdAt: Date.now(),
-        title: title.trim() || "A precious moment",
+        title: title.trim() || t.booth.defaultTitle,
         note: "",
         category,
         layout,
@@ -351,19 +357,21 @@ export default function PhotoboothFlow() {
         for (const [n, id] of firsts) {
           if (count >= n) {
             const ach = unlockAchievement(id);
-            if (ach) mochiToast(ach.label, ach.description, ach.emoji);
+            if (ach) {
+              const tr = t.achievements[ach.id as keyof typeof t.achievements];
+              mochiToast(tr.label, tr.description, ach.emoji);
+            }
           }
         }
         if (triedFilters.current.size >= FILTERS.length) {
           const ach = unlockAchievement("all-filters");
-          if (ach) mochiToast(ach.label, ach.description, ach.emoji);
+          if (ach) {
+            const tr = t.achievements["all-filters"];
+            mochiToast(tr.label, tr.description, ach.emoji);
+          }
         }
       } else {
-        mochiToast(
-          "Scrapbook is full!",
-          "The strip is ready to download, but Mochi couldn't store it. Try deleting old memories.",
-          "🥺"
-        );
+        mochiToast(t.booth.storageFullTitle, t.booth.storageFullBody, "🥺");
       }
     } finally {
       setSaving(false);
@@ -395,9 +403,9 @@ export default function PhotoboothFlow() {
       a.download = `dear-memory-${new Date().toISOString().slice(0, 10)}.gif`;
       a.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 5000);
-      mochiToast("Your memory movie is ready!", "A little GIF to share everywhere ✨", "🎬");
+      mochiToast(t.booth.gifReadyTitle, t.booth.gifReadyBody, "🎬");
     } catch {
-      mochiToast("Oh no, the GIF got shy…", "Please try again!", "🥺");
+      mochiToast(t.booth.gifFailTitle, t.booth.gifFailBody, "🥺");
     } finally {
       setGifBusy(false);
     }
@@ -408,7 +416,7 @@ export default function PhotoboothFlow() {
     const shared = await shareImage(finalStrip, "dear-memory.jpg", "Dear Memory 💖");
     if (!shared) {
       download();
-      mochiToast("Sharing isn't supported here", "So Mochi downloaded it for you instead!", "💌");
+      mochiToast(t.booth.shareFailTitle, t.booth.shareFailBody, "💌");
     }
   };
 
@@ -430,13 +438,14 @@ export default function PhotoboothFlow() {
             exit={{ opacity: 0, y: -16 }}
             className="flex flex-col items-center gap-8 py-6"
           >
-            <MochiDino pose="waving" size={170} message={MOCHI_LINES.beforePhoto} float />
+            <MochiDino pose="waving" size={170} message={t.mochi.beforePhoto} float />
             <h1 className="text-center font-display text-3xl sm:text-4xl">
-              The <span className="title-gradient">Photobooth</span> 📸
+              {t.booth.title1}
+              <span className="title-gradient">{t.booth.titleHi}</span> 📸
             </h1>
 
             <div className="plush-card w-full max-w-2xl p-7">
-              <h2 className="font-display text-lg">1 · How many photos?</h2>
+              <h2 className="font-display text-lg">{t.booth.step1}</h2>
               <div className="mt-3 flex gap-3">
                 {([4, 6] as const).map((n) => (
                   <button
@@ -448,12 +457,12 @@ export default function PhotoboothFlow() {
                         : "border-white/70 bg-white/50 hover:bg-white/80"
                     }`}
                   >
-                    {n === 4 ? "🎞️ 4-photo strip" : "✨ 6-photo strip"}
+                    {n === 4 ? t.booth.strip4 : t.booth.strip6}
                   </button>
                 ))}
               </div>
 
-              <h2 className="mt-6 font-display text-lg">2 · What kind of moment?</h2>
+              <h2 className="mt-6 font-display text-lg">{t.booth.step2}</h2>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {CATEGORIES.map((c) => (
                   <button
@@ -466,13 +475,13 @@ export default function PhotoboothFlow() {
                     }`}
                   >
                     <span className="mr-1">{c.emoji}</span>
-                    {c.label}
+                    {t.categories[c.id].label}
                   </button>
                 ))}
               </div>
 
               <button onClick={() => setStage("capture")} className="btn-candy mt-7 w-full">
-                Open the booth 💖
+                {t.booth.open}
               </button>
             </div>
           </motion.section>
@@ -496,12 +505,12 @@ export default function PhotoboothFlow() {
               />
               <p className="glass-strong max-w-xs rounded-3xl px-4 py-2.5 font-display text-sm shadow-bubble">
                 {shooting
-                  ? MOCHI_LINES.countdown
+                  ? t.mochi.countdown
                   : allCaptured
-                    ? MOCHI_LINES.afterPhoto
+                    ? t.mochi.afterPhoto
                     : retakeIndex !== null
-                      ? "One more try — you got this! 🌟"
-                      : "Pick a dreamy filter, then press the pink button!"}
+                      ? t.booth.retakeOne
+                      : t.booth.pickFilter}
               </p>
             </div>
 
@@ -520,20 +529,20 @@ export default function PhotoboothFlow() {
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-lav-200 via-blossom-100 to-skyy-200">
                     <span className="text-5xl">🪄</span>
-                    <p className="font-display text-cocoa">Demo mode — pretend you look adorable (you do)</p>
+                    <p className="font-display text-cocoa">{t.booth.demoTitle}</p>
                   </div>
                 )}
 
                 {cameraError && !demoMode && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-cream-100/95 p-6 text-center">
                     <Image src="/mochi/mochi-curious.png" alt="" width={110} height={130} />
-                    <p className="max-w-sm text-sm text-cocoa">{cameraError}</p>
+                    <p className="max-w-sm text-sm text-cocoa">{t.booth.cameraError}</p>
                     <div className="flex gap-3">
                       <button onClick={() => startCamera(facing)} className="btn-cloud !px-5 !py-2 !text-sm">
-                        🔁 Retry camera
+                        {t.booth.retryCamera}
                       </button>
                       <button onClick={() => setDemoMode(true)} className="btn-candy !px-5 !py-2 !text-sm">
-                        🪄 Demo mode
+                        {t.booth.demoMode}
                       </button>
                     </div>
                   </div>
@@ -571,7 +580,7 @@ export default function PhotoboothFlow() {
                         : "border-white/70 bg-white/60 hover:bg-white/90"
                     }`}
                   >
-                    {f.emoji} {f.label}
+                    {f.emoji} {t.filters[f.id]}
                   </button>
                 ))}
               </div>
@@ -585,7 +594,7 @@ export default function PhotoboothFlow() {
                   setMuted(next);
                   setMutedState(next);
                 }}
-                title={muted ? "Unmute cute sounds" : "Mute sounds"}
+                title={muted ? t.booth.unmuteTip : t.booth.muteTip}
                 className="btn-cloud !px-4 !py-2.5 !text-sm"
               >
                 {muted ? "🔕" : "🔔"}
@@ -595,14 +604,14 @@ export default function PhotoboothFlow() {
                 disabled={shooting || demoMode}
                 className="btn-cloud !px-5 !py-2.5 !text-sm disabled:opacity-40"
               >
-                🔄 Flip camera
+                {t.booth.flip}
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={shooting}
                 className="btn-cloud !px-5 !py-2.5 !text-sm disabled:opacity-40"
               >
-                🖼️ From gallery
+                {t.booth.fromGallery}
               </button>
               <input
                 ref={fileInputRef}
@@ -620,12 +629,12 @@ export default function PhotoboothFlow() {
                 disabled={shooting || (!demoMode && !!cameraError)}
                 className="btn-candy !px-9 disabled:opacity-50"
               >
-                {shooting ? "Smileeee! 📸" : allCaptured ? "📸 Shoot again" : "📸 Start"}
+                {shooting ? t.booth.shooting : allCaptured ? t.booth.shootAgain : t.booth.start}
               </button>
               {allCaptured && !shooting && (
                 <button onClick={() => setStage("decorate")} className="btn-candy !bg-none !px-6"
                   style={{ background: "linear-gradient(135deg,#9ed193,#84bd78)" }}>
-                  Decorate → 🎀
+                  {t.booth.decorate}
                 </button>
               )}
             </div>
@@ -636,7 +645,7 @@ export default function PhotoboothFlow() {
                 <button
                   key={i}
                   onClick={() => photos[i] && retake(i)}
-                  title={photos[i] ? "Tap to retake this one" : "Waiting…"}
+                  title={photos[i] ? t.booth.tapRetakeTip : t.booth.waiting}
                   className={`relative h-20 w-[6.66rem] overflow-hidden rounded-xl border-2 transition-all ${
                     retakeIndex === i
                       ? "border-blossom-400 ring-2 ring-blossom-300"
@@ -649,7 +658,7 @@ export default function PhotoboothFlow() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={photos[i]}
-                      alt={`Photo ${i + 1}`}
+                      alt={`${t.booth.photoAlt} ${i + 1}`}
                       className={`h-full w-full object-cover ${filterInfo.className}`}
                     />
                   ) : (
@@ -659,7 +668,7 @@ export default function PhotoboothFlow() {
               ))}
             </div>
             {allCaptured && (
-              <p className="text-xs text-cocoaSoft">Tap any photo to retake it ✨</p>
+              <p className="text-xs text-cocoaSoft">{t.booth.tapRetake}</p>
             )}
           </motion.section>
         )}
@@ -750,28 +759,28 @@ export default function PhotoboothFlow() {
               <div className="flex items-center gap-3">
                 <MochiDino pose="happy" size={76} float={false} interactive={false} />
                 <p className="glass-strong rounded-3xl px-4 py-2 font-display text-sm shadow-bubble">
-                  {MOCHI_LINES.decorating}
+                  {t.mochi.decorating}
                 </p>
               </div>
 
               <div className="plush-card p-5">
-                <h3 className="font-display text-base">Give it a name 💌</h3>
+                <h3 className="font-display text-base">{t.booth.nameTitle}</h3>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value.slice(0, 40))}
-                  placeholder="our little adventure…"
+                  placeholder={t.booth.namePh}
                   className="mt-2 w-full rounded-2xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm outline-none placeholder:text-cocoaSoft/60 focus:ring-2 focus:ring-blossom-300"
                 />
               </div>
 
               <div className="plush-card p-5">
-                <h3 className="font-display text-base">Frame color 🖼️</h3>
+                <h3 className="font-display text-base">{t.booth.frameTitle}</h3>
                 <div className="mt-3 flex flex-wrap gap-2.5">
                   {FRAMES.map((f) => (
                     <button
                       key={f.id}
                       onClick={() => setFrame(f.id)}
-                      title={f.label}
+                      title={t.frames[f.id]}
                       className={`h-9 w-9 rounded-full border-2 transition-transform hover:scale-110 ${f.swatchClass} ${
                         frame === f.id ? "border-cocoa scale-110" : "border-white"
                       }`}
@@ -781,7 +790,7 @@ export default function PhotoboothFlow() {
               </div>
 
               <div className="plush-card p-5">
-                <h3 className="font-display text-base">Stickers 🎀</h3>
+                <h3 className="font-display text-base">{t.booth.stickersTitle}</h3>
                 <div className="mt-3 grid grid-cols-6 gap-2">
                   {STICKERS.map((s) => (
                     <button
@@ -802,7 +811,7 @@ export default function PhotoboothFlow() {
 
                 {selectedSticker && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl bg-white/70 p-2.5">
-                    <span className="text-xs font-semibold text-cocoaSoft">Selected:</span>
+                    <span className="text-xs font-semibold text-cocoaSoft">{t.booth.selected}</span>
                     {[
                       ["➖", () => tweakSelected((s) => ({ scale: Math.max(0.5, s.scale - 0.15) }))],
                       ["➕", () => tweakSelected((s) => ({ scale: Math.min(3, s.scale + 0.15) }))],
@@ -825,17 +834,15 @@ export default function PhotoboothFlow() {
                     </button>
                   </div>
                 )}
-                <p className="mt-3 text-xs text-cocoaSoft">
-                  Tap a sticker to add it, then drag it anywhere on your strip ✨
-                </p>
+                <p className="mt-3 text-xs text-cocoaSoft">{t.booth.stickerHint}</p>
               </div>
 
               <div className="flex gap-3">
                 <button onClick={() => setStage("capture")} className="btn-cloud flex-1 !text-base">
-                  ← Back
+                  {t.booth.back}
                 </button>
                 <button onClick={finishAndSave} disabled={saving} className="btn-candy flex-1 !text-base">
-                  {saving ? MOCHI_LINES.loading : "Keep it forever 💖"}
+                  {saving ? t.mochi.loading : t.booth.keep}
                 </button>
               </div>
             </div>
@@ -850,14 +857,14 @@ export default function PhotoboothFlow() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center gap-6 py-6"
           >
-            <MochiDino pose="excited" size={150} message={MOCHI_LINES.afterPhoto} />
+            <MochiDino pose="excited" size={150} message={t.mochi.afterPhoto} />
             <h2 className="text-center font-display text-3xl">
-              {savedMemory ? "Tucked into your scrapbook! 💌" : "Your strip is ready! 💌"}
+              {savedMemory ? t.booth.doneSaved : t.booth.doneReady}
             </h2>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <motion.img
               src={finalStrip}
-              alt="Your finished photo strip"
+              alt={t.booth.stripAlt}
               initial={{ rotate: -4 }}
               animate={{ rotate: [-4, 3, -2, 0] }}
               transition={{ duration: 1 }}
@@ -865,16 +872,16 @@ export default function PhotoboothFlow() {
             />
             <div className="flex flex-wrap justify-center gap-3">
               <button onClick={download} className="btn-candy">
-                ⬇️ Download
+                {t.booth.download}
               </button>
               <button onClick={makeGif} disabled={gifBusy} className="btn-candy disabled:opacity-60">
-                {gifBusy ? "🎬 Filming…" : "🎬 Memory movie (GIF)"}
+                {gifBusy ? t.booth.gifBusy : t.booth.gif}
               </button>
               <button onClick={share} className="btn-cloud">
-                📤 Share
+                {t.booth.share}
               </button>
               <Link href="/scrapbook" className="btn-cloud">
-                📖 Open scrapbook
+                {t.booth.openScrapbook}
               </Link>
               <button
                 onClick={() => {
@@ -886,7 +893,7 @@ export default function PhotoboothFlow() {
                 }}
                 className="btn-cloud"
               >
-                ✨ New memory
+                {t.booth.newMemory}
               </button>
             </div>
           </motion.section>
