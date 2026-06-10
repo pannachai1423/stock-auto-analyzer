@@ -1,18 +1,52 @@
-import type { Metadata } from "next";
-import { AppNav } from "@/components/AppNav";
+import type { Metadata, Viewport } from "next";
+import { Baloo_2, Quicksand } from "next/font/google";
 import "./globals.css";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import FloatingBackground from "@/components/FloatingBackground";
+import MochiToaster from "@/components/MochiToaster";
+
+const display = Baloo_2({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display"
+});
+
+const body = Quicksand({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body"
+});
 
 export const metadata: Metadata = {
-  title: "Stock Auto Analyzer",
-  description: "Yahoo Finance powered stock dashboard with trend, options, and support/resistance analysis."
+  title: "Dear Memory — Some moments only happen once 💖",
+  description:
+    "A magical online world where people save the moments they never want to lose. Korean-style photobooth, dreamy filters, scrapbooks, and time capsules — with Mochi Dino by your side.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png"
+  },
+  openGraph: {
+    title: "Dear Memory 💖",
+    description: "Some moments only happen once. Let's keep this one forever.",
+    images: ["/icons/icon-512.png"]
+  }
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export const viewport: Viewport = {
+  themeColor: "#fff8f0"
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th">
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body>
-        <AppNav />
-        {children}
+        <FloatingBackground />
+        <Navbar />
+        <main className="relative z-10 mx-auto w-[min(1080px,94vw)] pt-8">{children}</main>
+        <Footer />
+        <MochiToaster />
       </body>
     </html>
   );
