@@ -3,69 +3,142 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  background: #071014;
-}
-
-:root[data-theme="light"] {
   color-scheme: light;
 }
 
-* {
-  box-sizing: border-box;
+html {
+  scroll-behavior: smooth;
 }
 
 body {
+  @apply font-body text-cocoa bg-cream-100;
+  background-image:
+    radial-gradient(1200px 600px at 85% -10%, rgba(230, 219, 255, 0.55), transparent 60%),
+    radial-gradient(1000px 500px at -10% 20%, rgba(205, 235, 255, 0.5), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(255, 214, 232, 0.55), transparent 60%);
+  background-attachment: fixed;
   min-height: 100vh;
-  margin: 0;
-  background:
-    linear-gradient(180deg, rgba(18, 33, 39, .94), rgba(7, 16, 20, 1) 330px),
-    #071014;
-  color: #e6f0ed;
-  font-family: Arial, Helvetica, sans-serif;
 }
 
-:root[data-theme="light"] body {
-  background: #f4f7f8;
-  color: #071014;
+::selection {
+  background: #ffd6e8;
+  color: #6b5b53;
 }
 
-:root[data-theme="light"] .bg-ink,
-:root[data-theme="light"] .bg-ink\/75 {
-  background-color: rgba(244, 247, 248, .9);
+/* soft pastel scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #ffd6e8;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ffbcd9;
 }
 
-:root[data-theme="light"] .bg-panel,
-:root[data-theme="light"] .bg-panelSoft {
-  background-color: #ffffff;
+@layer components {
+  .glass {
+    @apply bg-white/55 backdrop-blur-xl border border-white/70;
+  }
+  .glass-strong {
+    @apply bg-white/75 backdrop-blur-xl border border-white/80;
+  }
+  .plush-card {
+    @apply glass rounded-squish shadow-plush;
+  }
+  .btn-candy {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 font-display text-lg
+      text-white shadow-bubble transition-transform duration-200
+      hover:scale-105 active:scale-95 select-none;
+    background: linear-gradient(135deg, #ff9ec7 0%, #f87fb2 55%, #bda5f2 130%);
+  }
+  .btn-cloud {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 font-display text-lg
+      text-cocoa glass-strong shadow-plush transition-transform duration-200
+      hover:scale-105 active:scale-95 select-none;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold glass shadow-plush;
+  }
+  .title-gradient {
+    background: linear-gradient(120deg, #84bd78 0%, #f87fb2 50%, #bda5f2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
-:root[data-theme="light"] .border-line {
-  border-color: #d6e0e4;
+/* dreamy filter previews (photobooth) */
+.filter-none-x {
+  filter: none;
+}
+.filter-korean-beauty {
+  filter: brightness(1.08) contrast(0.92) saturate(1.05) hue-rotate(-4deg);
+}
+.filter-soft-skin {
+  filter: brightness(1.1) contrast(0.85) saturate(0.92) blur(0.4px);
+}
+.filter-dreamy-glow {
+  filter: brightness(1.12) contrast(0.88) saturate(1.15) sepia(0.08);
+}
+.filter-fairy-glow {
+  filter: brightness(1.15) contrast(0.82) saturate(1.2) hue-rotate(8deg);
+}
+.filter-vintage-film {
+  filter: sepia(0.38) contrast(1.05) brightness(0.98) saturate(0.85);
+}
+.filter-kawaii-pink {
+  filter: brightness(1.08) saturate(1.25) hue-rotate(-12deg) contrast(0.93);
+}
+.filter-anime-style {
+  filter: contrast(1.25) saturate(1.55) brightness(1.05);
 }
 
-:root[data-theme="light"] .text-white,
-:root[data-theme="light"] .text-slate-100,
-:root[data-theme="light"] .text-slate-200,
-:root[data-theme="light"] .text-slate-300 {
-  color: #102027;
+/* gentle entrance for page sections */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
-:root[data-theme="light"] .text-slate-400,
-:root[data-theme="light"] .text-slate-500 {
-  color: #5f727a;
+/* camera flash overlay */
+@keyframes flash {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.flash {
+  animation: flash 0.5s ease-out both;
 }
 
-button, input, select {
-  font: inherit;
+/* blinking eyelids over the mascot's raster eyes */
+@keyframes blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(0);
+  }
+  94%,
+  98% {
+    transform: scaleY(1);
+  }
 }
-
-.focus-ring:focus-visible {
-  outline: 2px solid #44c7d8;
-  outline-offset: 2px;
-}
-
-.scrollbar-thin {
-  scrollbar-color: #31464e #0d181d;
-  scrollbar-width: thin;
+.mochi-eyelid {
+  animation: blink 4.6s infinite;
+  transform-origin: top center;
 }
