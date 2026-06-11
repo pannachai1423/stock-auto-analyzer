@@ -13,7 +13,16 @@ export type FilterId =
   | "mono-film"
   | "anime-style";
 
-export type FrameId = "cream" | "pink" | "mint" | "lavender" | "sky" | "night";
+export type FrameId =
+  | "cream"
+  | "pink"
+  | "mint"
+  | "lavender"
+  | "sky"
+  | "night"
+  | "mochi-party"
+  | "hearts"
+  | "stars";
 
 export type CategoryId =
   | "love"
@@ -43,6 +52,8 @@ export interface Memory {
   note: string;
   category: CategoryId;
   layout: 4 | 6;
+  /** photo arrangement — vertical strip or 2-column grid (old memories default to strip) */
+  layoutStyle?: "strip" | "grid";
   filter: FilterId;
   frame: FrameId;
   /** final composited photo strip as data URL */

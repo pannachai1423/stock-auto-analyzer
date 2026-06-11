@@ -1,22 +1,61 @@
 "use client";
 
 import type { FilterId, FrameId, PlacedSticker } from "./types";
-import { filterById, frameById, type FilterFx } from "./filters";
+import { filterById, frameById, type FilterFx, type FrameDecor } from "./filters";
 import { stickerByKey } from "./stickers";
 import { smoothSkin, type BeautyLevel } from "./beauty";
 
-/** Geometry for a photo strip. All sizes in canvas pixels. */
-export const STRIP = {
-  width: 480,
-  pad: 26,
-  gap: 16,
-  photoRatio: 3 / 4, // height / width of each photo
-  captionHeight: 96
-};
+export type LayoutStyle = "strip" | "grid";
 
-export function stripHeight(layout: 4 | 6): number {
-  const photoH = (STRIP.width - STRIP.pad * 2) * STRIP.photoRatio;
-  return STRIP.pad + layout * photoH + (layout - 1) * STRIP.gap + STRIP.captionHeight;
+export interface PhotoRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface StripGeometry {
+  width: number;
+  height: number;
+  pad: number;
+  captionY: number;
+  rects: PhotoRect[];
+}
+
+const PAD = 26;
+const GAP = 16;
+const CAPTION_H = 96;
+const RATIO = 3 / 4; // photo height / width
+
+/**
+ * Layout geometry for every booth style:
+ * - "strip": the classic Korean 1×4 / 1×6 vertical strip
+ * - "grid": 2×2 or 2×3 like Life4Cuts grids
+ */
+export function getStripGeometry(count: 4 | 6, style: LayoutStyle): StripGeometry {
+  const rects: PhotoRect[] = [];
+  if (style === "grid") {
+    const width = 640;
+    const cols = 2;
+    const rows = count / 2;
+    const w = (width - PAD * 2 - GAP) / cols;
+    const h = w * RATIO;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        rects.push({ x: PAD + c * (w + GAP), y: PAD + r * (h + GAP), w, h });
+      }
+    }
+    const height = Math.round(PAD + rows * h + (rows - 1) * GAP + CAPTION_H);
+    return { width, height, pad: PAD, captionY: height - CAPTION_H, rects };
+  }
+  const width = 480;
+  const w = width - PAD * 2;
+  const h = w * RATIO;
+  for (let i = 0; i < count; i++) {
+    rects.push({ x: PAD, y: PAD + i * (h + GAP), w, h });
+  }
+  const height = Math.round(PAD + count * h + (count - 1) * GAP + CAPTION_H);
+  return { width, height, pad: PAD, captionY: height - CAPTION_H, rects };
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -121,6 +160,47 @@ export function applyFx(
   }
 }
 
+/** Draws a designed frame (emoji border + official Mochi art) onto the strip. */
+async function drawFrameDecor(
+  ctx: CanvasRenderingContext2D,
+  geo: StripGeometry,
+  decor: FrameDecor
+) {
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // top border row
+  ctx.font = "14px serif";
+  ctx.globalAlpha = 0.95;
+  let e = 0;
+  for (let x = geo.pad + 10; x <= geo.width - geo.pad - 10; x += 52) {
+    ctx.fillText(decor.top[e % decor.top.length], x, 13);
+    e++;
+  }
+
+  // corners
+  ctx.font = "16px serif";
+  ctx.fillText(decor.corner, 13, 13);
+  ctx.fillText(decor.corner, geo.width - 13, 13);
+  ctx.fillText(decor.corner, 13, geo.height - 14);
+  if (!decor.mochi) ctx.fillText(decor.corner, geo.width - 13, geo.height - 14);
+  ctx.globalAlpha = 1;
+
+  // official Mochi art tucked into the caption corner
+  if (decor.mochi) {
+    try {
+      const img = await loadImage(decor.mochi);
+      const h = 64;
+      const w = h * (img.width / img.height);
+      ctx.drawImage(img, geo.width - w - 10, geo.height - h - 8, w, h);
+    } catch {
+      // decor art is optional — never block the strip
+    }
+  }
+  ctx.restore();
+}
+
 function roundedRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -139,8 +219,9 @@ function roundedRectPath(
 }
 
 export interface ComposeOptions {
-  photos: string[]; // raw captured frames as data URLs
-  layout: 4 | 6;
+  photos: string[]; // the chosen shots, in strip order
+  count: 4 | 6;
+  style: LayoutStyle;
   filter: FilterId;
   frame: FrameId;
   stickers: PlacedSticker[];
@@ -150,11 +231,10 @@ export interface ComposeOptions {
 
 /** Composites the final keepsake strip and returns a JPEG data URL. */
 export async function composeStrip(opts: ComposeOptions): Promise<string> {
-  const { width, pad, gap, photoRatio, captionHeight } = STRIP;
-  const height = stripHeight(opts.layout);
+  const geo = getStripGeometry(opts.count, opts.style);
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = Math.round(height);
+  canvas.width = geo.width;
+  canvas.height = geo.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas unavailable");
 
@@ -164,41 +244,40 @@ export async function composeStrip(opts: ComposeOptions): Promise<string> {
   ctx.fillStyle = frame.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const photoW = width - pad * 2;
-  const photoH = photoW * photoRatio;
   const supportsFilter = typeof ctx.filter === "string";
-
-  const images = await Promise.all(opts.photos.slice(0, opts.layout).map(loadImage));
+  const images = await Promise.all(opts.photos.slice(0, opts.count).map(loadImage));
   images.forEach((img, i) => {
-    const y = pad + i * (photoH + gap);
+    const r = geo.rects[i];
+    if (!r) return;
     ctx.save();
-    roundedRectPath(ctx, pad, y, photoW, photoH, 14);
+    roundedRectPath(ctx, r.x, r.y, r.w, r.h, 14);
     ctx.clip();
     if (supportsFilter && filter.css !== "none") ctx.filter = filter.css;
-    drawCover(ctx, img, pad, y, photoW, photoH);
+    drawCover(ctx, img, r.x, r.y, r.w, r.h);
     ctx.filter = "none";
-    applyFx(ctx, canvas, pad, y, photoW, photoH, filter.fx);
+    applyFx(ctx, canvas, r.x, r.y, r.w, r.h, filter.fx);
     ctx.restore();
   });
 
   // caption
-  const capY = canvas.height - captionHeight;
   ctx.fillStyle = frame.text;
   ctx.textAlign = "center";
   ctx.font = "600 22px 'Baloo 2', 'Comic Sans MS', cursive";
-  ctx.fillText("Dear Memory", width / 2, capY + 36);
+  ctx.fillText("Dear Memory", geo.width / 2, geo.captionY + 36);
   ctx.font = "500 14px 'Quicksand', sans-serif";
   ctx.globalAlpha = 0.85;
   const caption = opts.title ? `${opts.title}  ·  ${opts.dateLabel}` : opts.dateLabel;
-  ctx.fillText(caption, width / 2, capY + 60);
+  ctx.fillText(caption, geo.width / 2, geo.captionY + 60);
   ctx.globalAlpha = 1;
+
+  if (frame.decor) await drawFrameDecor(ctx, geo, frame.decor);
 
   // stickers (positions are fractions of the full strip)
   for (const s of opts.stickers) {
     const def = stickerByKey(s.sticker);
     if (!def) continue;
-    const cx = s.x * width;
-    const cy = s.y * canvas.height;
+    const cx = s.x * geo.width;
+    const cy = s.y * geo.height;
     const size = 52 * s.scale;
     ctx.save();
     ctx.translate(cx, cy);

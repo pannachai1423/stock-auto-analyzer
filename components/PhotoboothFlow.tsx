@@ -8,11 +8,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import MochiDino from "./MochiDino";
 import { mochiToast } from "./MochiToaster";
 import { useLang } from "@/lib/i18n";
-import { FILTERS, FRAMES, filterById, frameById } from "@/lib/filters";
+import { FILTERS, FRAMES, filterById, frameById, type FilterFx, type FrameDecor } from "@/lib/filters";
 import { CATEGORIES } from "@/lib/categories";
 import { STICKERS, stickerByKey } from "@/lib/stickers";
-import { composeStrip, captureFrame, STRIP, stripHeight } from "@/lib/strip";
-import type { FilterFx } from "@/lib/filters";
+import {
+  composeStrip,
+  captureFrame,
+  getStripGeometry,
+  type LayoutStyle,
+  type StripGeometry
+} from "@/lib/strip";
 import type { BeautyLevel } from "@/lib/beauty";
 import { composeGif } from "@/lib/gif";
 import { shareImage } from "@/lib/share";
@@ -20,9 +25,23 @@ import { sfx, isMuted, setMuted } from "@/lib/sounds";
 import { loadMemories, saveMemory, newId, unlockAchievement } from "@/lib/storage";
 import type { CategoryId, FilterId, FrameId, Memory, PlacedSticker } from "@/lib/types";
 
-type Stage = "setup" | "capture" | "decorate" | "done";
+type Stage = "setup" | "capture" | "select" | "decorate" | "done";
 
 const COUNTDOWN_SECONDS = 3;
+/** like the real booths: always take extra shots, then pick favorites */
+const SHOT_COUNT = 8;
+
+interface LayoutOption {
+  id: string;
+  count: 4 | 6;
+  style: LayoutStyle;
+}
+
+const LAYOUTS: LayoutOption[] = [
+  { id: "strip4", count: 4, style: "strip" },
+  { id: "grid4", count: 4, style: "grid" },
+  { id: "grid6", count: 6, style: "grid" }
+];
 
 const GRAIN_URI =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23n)' opacity='0.65'/%3E%3C/svg%3E\")";
@@ -70,6 +89,67 @@ function FxOverlay({ fx, rounded }: { fx?: FilterFx; rounded?: number }) {
   );
 }
 
+/** live preview of a designed frame (emoji border + official Mochi art) */
+function FrameDecorOverlay({
+  decor,
+  geo,
+  scale
+}: {
+  decor?: FrameDecor;
+  geo: StripGeometry;
+  scale: number;
+}) {
+  if (!decor) return null;
+  const tops: { x: number; e: string }[] = [];
+  let i = 0;
+  for (let x = geo.pad + 10; x <= geo.width - geo.pad - 10; x += 52) {
+    tops.push({ x, e: decor.top[i % decor.top.length] });
+    i++;
+  }
+  const corner = (x: number, y: number, key: string) => (
+    <span
+      key={key}
+      aria-hidden
+      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+      style={{ left: x * scale, top: y * scale, fontSize: 16 * scale }}
+    >
+      {decor.corner}
+    </span>
+  );
+  return (
+    <>
+      {tops.map((tp, idx) => (
+        <span
+          key={idx}
+          aria-hidden
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+          style={{ left: tp.x * scale, top: 13 * scale, fontSize: 14 * scale }}
+        >
+          {tp.e}
+        </span>
+      ))}
+      {corner(13, 13, "tl")}
+      {corner(geo.width - 13, 13, "tr")}
+      {corner(13, geo.height - 14, "bl")}
+      {!decor.mochi && corner(geo.width - 13, geo.height - 14, "br")}
+      {decor.mochi && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={decor.mochi}
+          alt=""
+          draggable={false}
+          className="pointer-events-none absolute"
+          style={{
+            height: 64 * scale,
+            right: 10 * scale,
+            bottom: 8 * scale
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 /** pastel placeholder frames so the booth still works without a camera */
 function demoFrame(index: number): string {
   const canvas = document.createElement("canvas");
@@ -82,7 +162,9 @@ function demoFrame(index: number): string {
     ["#fff8f0", "#ffd6e8"],
     ["#e6dbff", "#cdebc6"],
     ["#cdebff", "#ffe8f1"],
-    ["#ffd6e8", "#e3f5df"]
+    ["#ffd6e8", "#e3f5df"],
+    ["#e3f5df", "#ffe8f1"],
+    ["#fff8f0", "#cdebff"]
   ];
   const [a, b] = palettes[index % palettes.length];
   const g = ctx.createLinearGradient(0, 0, 640, 480);
@@ -93,7 +175,7 @@ function demoFrame(index: number): string {
   ctx.font = "120px serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(["💖", "✨", "🌸", "🎀", "⭐", "💌"][index % 6], 320, 240);
+  ctx.fillText(["💖", "✨", "🌸", "🎀", "⭐", "💌", "🌷", "🫧"][index % 8], 320, 240);
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
@@ -103,7 +185,7 @@ export default function PhotoboothFlow() {
   const initialCategory = (params.get("category") as CategoryId) || "everyday";
 
   const [stage, setStage] = useState<Stage>("setup");
-  const [layout, setLayout] = useState<4 | 6>(4);
+  const [layoutId, setLayoutId] = useState("strip4");
   const [category, setCategory] = useState<CategoryId>(initialCategory);
   const [filter, setFilter] = useState<FilterId>("korean-beauty");
   const [frame, setFrame] = useState<FrameId>("cream");
@@ -112,6 +194,7 @@ export default function PhotoboothFlow() {
   const [demoMode, setDemoMode] = useState(false);
 
   const [photos, setPhotos] = useState<string[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flashing, setFlashing] = useState(false);
   const [shooting, setShooting] = useState(false);
@@ -136,14 +219,19 @@ export default function PhotoboothFlow() {
     setMutedState(isMuted());
   }, []);
 
+  const layout = LAYOUTS.find((l) => l.id === layoutId) ?? LAYOUTS[0];
+  const layoutLabel = (id: string) =>
+    id === "strip4" ? t.booth.layoutStrip4 : id === "grid4" ? t.booth.layoutGrid4 : t.booth.layoutGrid6;
+
   const filterInfo = filterById(filter);
   const frameInfo = frameById(frame);
   const mirrored = facing === "user";
+  const pickedPhotos = useMemo(() => selected.map((i) => photos[i]).filter(Boolean), [selected, photos]);
 
   /* ---------------- camera ---------------- */
 
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
     streamRef.current = null;
   }, []);
 
@@ -180,7 +268,7 @@ export default function PhotoboothFlow() {
 
   const snapOne = useCallback((): string => {
     if (demoMode || !videoRef.current || !streamRef.current) {
-      return demoFrame(Math.floor(Math.random() * 6));
+      return demoFrame(Math.floor(Math.random() * 8));
     }
     return captureFrame(videoRef.current, mirrored, beauty);
   }, [demoMode, mirrored, beauty]);
@@ -231,9 +319,10 @@ export default function PhotoboothFlow() {
 
   const startShoot = useCallback(() => {
     triedFilters.current.add(filter);
-    setPhotos(Array(layout).fill(""));
-    shootSequence(Array.from({ length: layout }, (_, i) => i));
-  }, [filter, layout, shootSequence]);
+    setPhotos(Array(SHOT_COUNT).fill(""));
+    setSelected([]);
+    shootSequence(Array.from({ length: SHOT_COUNT }, (_, i) => i));
+  }, [filter, shootSequence]);
 
   const retake = useCallback(
     (i: number) => {
@@ -244,7 +333,16 @@ export default function PhotoboothFlow() {
     [shooting, shootSequence]
   );
 
-  const allCaptured = photos.length === layout && photos.every(Boolean);
+  const allCaptured = photos.length === SHOT_COUNT && photos.every(Boolean);
+
+  const toggleSelect = (i: number) => {
+    setSelected((prev) => {
+      if (prev.includes(i)) return prev.filter((x) => x !== i);
+      if (prev.length >= layout.count) return prev;
+      sfx.pop();
+      return [...prev, i];
+    });
+  };
 
   /** lets users build a strip from gallery photos — no camera needed */
   const onFilesPicked = async (files: FileList | null) => {
@@ -269,28 +367,29 @@ export default function PhotoboothFlow() {
 
     const picked = await Promise.all(
       Array.from(files)
-        .slice(0, layout)
+        .slice(0, SHOT_COUNT)
         .map((f) => downscale(f).catch(() => ""))
     );
     setPhotos((prev) => {
-      const next = prev.length === layout ? [...prev] : Array(layout).fill("");
+      const next = prev.length === SHOT_COUNT ? [...prev] : Array(SHOT_COUNT).fill("");
       let p = 0;
       // fill empty slots first, then overwrite from the top
-      for (let i = 0; i < layout && p < picked.length; i++) {
+      for (let i = 0; i < SHOT_COUNT && p < picked.length; i++) {
         if (!next[i] && picked[p]) next[i] = picked[p++];
       }
-      for (let i = 0; i < layout && p < picked.length; i++) {
+      for (let i = 0; i < SHOT_COUNT && p < picked.length; i++) {
         if (picked[p]) next[i] = picked[p++];
       }
       return next;
     });
+    setSelected([]);
     sfx.pop();
   };
 
   /* ---------------- decorate ---------------- */
 
-  const stripW = STRIP.width;
-  const stripH = useMemo(() => Math.round(stripHeight(layout)), [layout]);
+  const geo = useMemo(() => getStripGeometry(layout.count, layout.style), [layout]);
+  const previewScale = (layout.style === "grid" ? 380 : 320) / geo.width;
   const stripBox = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; startX: number; startY: number; ox: number; oy: number } | null>(null);
 
@@ -299,7 +398,7 @@ export default function PhotoboothFlow() {
       id: newId(),
       sticker: key,
       x: 0.25 + Math.random() * 0.5,
-      y: 0.08 + Math.random() * 0.12,
+      y: 0.06 + Math.random() * 0.1,
       scale: 1,
       rotation: Math.round(Math.random() * 24 - 12)
     };
@@ -372,8 +471,9 @@ export default function PhotoboothFlow() {
     setSaving(true);
     try {
       const strip = await composeStrip({
-        photos,
-        layout,
+        photos: pickedPhotos,
+        count: layout.count,
+        style: layout.style,
         filter,
         frame,
         stickers,
@@ -386,7 +486,8 @@ export default function PhotoboothFlow() {
         title: title.trim() || t.booth.defaultTitle,
         note: "",
         category,
-        layout,
+        layout: layout.count,
+        layoutStyle: layout.style,
         filter,
         frame,
         stripDataUrl: strip
@@ -440,7 +541,7 @@ export default function PhotoboothFlow() {
     setGifBusy(true);
     try {
       const blob = await composeGif({
-        photos: photos.slice(0, layout),
+        photos: pickedPhotos,
         filter,
         frame,
         title: title.trim(),
@@ -471,10 +572,6 @@ export default function PhotoboothFlow() {
 
   /* ================= render ================= */
 
-  const photoW = stripW - STRIP.pad * 2;
-  const photoH = photoW * STRIP.photoRatio;
-  const previewScale = 320 / stripW;
-
   return (
     <div className="pb-8">
       <AnimatePresence mode="wait">
@@ -495,21 +592,44 @@ export default function PhotoboothFlow() {
 
             <div className="plush-card w-full max-w-2xl p-7">
               <h2 className="font-display text-lg">{t.booth.step1}</h2>
-              <div className="mt-3 flex gap-3">
-                {([4, 6] as const).map((n) => (
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {LAYOUTS.map((l) => (
                   <button
-                    key={n}
-                    onClick={() => setLayout(n)}
-                    className={`flex-1 rounded-3xl border-2 px-4 py-4 font-display text-lg transition-all ${
-                      layout === n
-                        ? "border-blossom-400 bg-blossom-100 text-[#a45a7c] shadow-bubble scale-[1.02]"
+                    key={l.id}
+                    onClick={() => setLayoutId(l.id)}
+                    className={`rounded-3xl border-2 px-4 py-4 transition-all ${
+                      layoutId === l.id
+                        ? "border-blossom-400 bg-blossom-100 shadow-bubble scale-[1.02]"
                         : "border-white/70 bg-white/50 hover:bg-white/80"
                     }`}
                   >
-                    {n === 4 ? t.booth.strip4 : t.booth.strip6}
+                    {/* tiny layout sketch */}
+                    <span
+                      className={`mx-auto mb-2 grid w-fit gap-[3px] ${
+                        l.style === "grid" ? "grid-cols-2" : "grid-cols-1"
+                      }`}
+                    >
+                      {Array.from({ length: l.count }, (_, i) => (
+                        <span
+                          key={i}
+                          className={`block rounded-[2px] ${
+                            layoutId === l.id ? "bg-blossom-400/70" : "bg-cocoaSoft/30"
+                          }`}
+                          style={{ width: l.style === "grid" ? 14 : 22, height: 9 }}
+                        />
+                      ))}
+                    </span>
+                    <span
+                      className={`block font-display text-sm leading-tight ${
+                        layoutId === l.id ? "text-[#a45a7c]" : "text-cocoa"
+                      }`}
+                    >
+                      {layoutLabel(l.id)}
+                    </span>
                   </button>
                 ))}
               </div>
+              <p className="mt-3 text-center text-xs text-cocoaSoft">{t.booth.shotsInfo}</p>
 
               <h2 className="mt-6 font-display text-lg">{t.booth.step2}</h2>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -697,27 +817,30 @@ export default function PhotoboothFlow() {
               />
               <button
                 onClick={startShoot}
-                disabled={shooting || (!demoMode && !!cameraError)}
+                disabled={shooting || (!demoMode && cameraError)}
                 className="btn-candy !px-9 disabled:opacity-50"
               >
                 {shooting ? t.booth.shooting : allCaptured ? t.booth.shootAgain : t.booth.start}
               </button>
               {allCaptured && !shooting && (
-                <button onClick={() => setStage("decorate")} className="btn-candy !bg-none !px-6"
-                  style={{ background: "linear-gradient(135deg,#9ed193,#84bd78)" }}>
-                  {t.booth.decorate}
+                <button
+                  onClick={() => setStage("select")}
+                  className="btn-candy !bg-none !px-6"
+                  style={{ background: "linear-gradient(135deg,#9ed193,#84bd78)" }}
+                >
+                  {t.booth.pickFavorites}
                 </button>
               )}
             </div>
 
-            {/* captured thumbnails */}
-            <div className="flex flex-wrap justify-center gap-2.5">
-              {Array.from({ length: layout }, (_, i) => (
+            {/* captured thumbnails (8 shots) */}
+            <div className="flex max-w-2xl flex-wrap justify-center gap-2.5">
+              {Array.from({ length: SHOT_COUNT }, (_, i) => (
                 <button
                   key={i}
                   onClick={() => photos[i] && retake(i)}
                   title={photos[i] ? t.booth.tapRetakeTip : t.booth.waiting}
-                  className={`relative h-20 w-[6.66rem] overflow-hidden rounded-xl border-2 transition-all ${
+                  className={`relative h-16 w-[5.4rem] overflow-hidden rounded-xl border-2 transition-all ${
                     retakeIndex === i
                       ? "border-blossom-400 ring-2 ring-blossom-300"
                       : photos[i]
@@ -738,9 +861,71 @@ export default function PhotoboothFlow() {
                 </button>
               ))}
             </div>
-            {allCaptured && (
-              <p className="text-xs text-cocoaSoft">{t.booth.tapRetake}</p>
-            )}
+            {allCaptured && <p className="text-xs text-cocoaSoft">{t.booth.tapRetake}</p>}
+          </motion.section>
+        )}
+
+        {/* ------------------------------------------------ select favorites */}
+        {stage === "select" && (
+          <motion.section
+            key="select"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="flex flex-col items-center gap-6 py-4"
+          >
+            <div className="flex items-center gap-4">
+              <MochiDino pose="curious" size={92} float={false} interactive={false} />
+              <p className="glass-strong max-w-xs rounded-3xl px-4 py-2.5 font-display text-sm shadow-bubble">
+                {t.booth.selectMochi}
+              </p>
+            </div>
+            <h2 className="text-center font-display text-2xl sm:text-3xl">
+              {t.booth.selectTitle(layout.count)}
+            </h2>
+            <p className="chip">{t.booth.selectCount(selected.length, layout.count)}</p>
+
+            <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+              {photos.map((p, i) => {
+                const order = selected.indexOf(i);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => toggleSelect(i)}
+                    className={`relative overflow-hidden rounded-2xl border-4 transition-all ${
+                      order >= 0
+                        ? "border-blossom-400 shadow-bubble scale-[1.03]"
+                        : "border-white opacity-90 hover:scale-[1.02] hover:opacity-100"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p}
+                      alt={`${t.booth.photoAlt} ${i + 1}`}
+                      className={`aspect-[4/3] w-full object-cover ${filterInfo.className}`}
+                    />
+                    {order >= 0 && (
+                      <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-blossom-400 font-display text-sm text-white shadow-bubble">
+                        {order + 1}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-3">
+              <button onClick={() => setStage("capture")} className="btn-cloud">
+                {t.booth.selectBack}
+              </button>
+              <button
+                onClick={() => setStage("decorate")}
+                disabled={selected.length !== layout.count}
+                className="btn-candy disabled:opacity-50"
+              >
+                {t.booth.decorate}
+              </button>
+            </div>
           </motion.section>
         )}
 
@@ -760,44 +945,49 @@ export default function PhotoboothFlow() {
                 onPointerDown={() => setSelectedSticker(null)}
                 className="relative select-none overflow-hidden rounded-2xl shadow-plushLg"
                 style={{
-                  width: stripW * previewScale,
-                  height: stripH * previewScale,
+                  width: geo.width * previewScale,
+                  height: geo.height * previewScale,
                   background: frameInfo.bg
                 }}
               >
-                {photos.slice(0, layout).map((p, i) => (
-                  <div
-                    key={i}
-                    className="absolute overflow-hidden"
-                    style={{
-                      left: STRIP.pad * previewScale,
-                      top: (STRIP.pad + i * (photoH + STRIP.gap)) * previewScale,
-                      width: photoW * previewScale,
-                      height: photoH * previewScale,
-                      borderRadius: 10
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p}
-                      alt=""
-                      draggable={false}
-                      className={`h-full w-full object-cover ${filterInfo.className}`}
-                    />
-                    <FxOverlay fx={filterInfo.fx} rounded={10} />
-                  </div>
-                ))}
+                {pickedPhotos.slice(0, layout.count).map((p, i) => {
+                  const r = geo.rects[i];
+                  if (!r) return null;
+                  return (
+                    <div
+                      key={i}
+                      className="absolute overflow-hidden"
+                      style={{
+                        left: r.x * previewScale,
+                        top: r.y * previewScale,
+                        width: r.w * previewScale,
+                        height: r.h * previewScale,
+                        borderRadius: 10
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p}
+                        alt=""
+                        draggable={false}
+                        className={`h-full w-full object-cover ${filterInfo.className}`}
+                      />
+                      <FxOverlay fx={filterInfo.fx} rounded={10} />
+                    </div>
+                  );
+                })}
                 <div
                   className="absolute inset-x-0 text-center"
-                  style={{ bottom: 30 * previewScale, color: frameInfo.text }}
+                  style={{ top: (geo.captionY + 18) * previewScale, color: frameInfo.text }}
                 >
-                  <p className="font-display" style={{ fontSize: 15 }}>
+                  <p className="font-display" style={{ fontSize: 22 * previewScale * 0.95 }}>
                     Dear Memory
                   </p>
-                  <p style={{ fontSize: 9, opacity: 0.85 }}>
+                  <p style={{ fontSize: 14 * previewScale * 0.95, opacity: 0.85 }}>
                     {title ? `${title}  ·  ${dateLabel}` : dateLabel}
                   </p>
                 </div>
+                <FrameDecorOverlay decor={frameInfo.decor} geo={geo} scale={previewScale} />
 
                 {stickers.map((s) => {
                   const def = stickerByKey(s.sticker);
@@ -813,8 +1003,8 @@ export default function PhotoboothFlow() {
                         selectedSticker === s.id ? "rounded-lg ring-2 ring-blossom-400/80" : ""
                       }`}
                       style={{
-                        left: s.x * stripW * previewScale,
-                        top: s.y * stripH * previewScale,
+                        left: s.x * geo.width * previewScale,
+                        top: s.y * geo.height * previewScale,
                         transform: `translate(-50%, -50%) rotate(${s.rotation}deg)`
                       }}
                     >
@@ -857,10 +1047,12 @@ export default function PhotoboothFlow() {
                       key={f.id}
                       onClick={() => setFrame(f.id)}
                       title={t.frames[f.id]}
-                      className={`h-9 w-9 rounded-full border-2 transition-transform hover:scale-110 ${f.swatchClass} ${
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm transition-transform hover:scale-110 ${f.swatchClass} ${
                         frame === f.id ? "border-cocoa scale-110" : "border-white"
                       }`}
-                    />
+                    >
+                      {f.decor ? f.decor.top[0] : ""}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -914,7 +1106,7 @@ export default function PhotoboothFlow() {
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => setStage("capture")} className="btn-cloud flex-1 !text-base">
+                <button onClick={() => setStage("select")} className="btn-cloud flex-1 !text-base">
                   {t.booth.back}
                 </button>
                 <button onClick={finishAndSave} disabled={saving} className="btn-candy flex-1 !text-base">
@@ -944,7 +1136,8 @@ export default function PhotoboothFlow() {
               initial={{ rotate: -4 }}
               animate={{ rotate: [-4, 3, -2, 0] }}
               transition={{ duration: 1 }}
-              className="w-[260px] rounded-2xl border-4 border-white shadow-plushLg"
+              className="rounded-2xl border-4 border-white shadow-plushLg"
+              style={{ width: layout.style === "grid" ? 330 : 260 }}
             />
             <div className="flex flex-wrap justify-center gap-3">
               <button onClick={download} className="btn-candy">
@@ -962,6 +1155,7 @@ export default function PhotoboothFlow() {
               <button
                 onClick={() => {
                   setPhotos([]);
+                  setSelected([]);
                   setStickers([]);
                   setTitle("");
                   setFinalStrip(null);

@@ -105,6 +105,16 @@ export const FILTERS: FilterInfo[] = [
 
 export const filterById = (id: FilterId) => FILTERS.find((f) => f.id === id) ?? FILTERS[0];
 
+/** Decorative frame design: emoji border + official Mochi art in the caption corner. */
+export interface FrameDecor {
+  /** emojis cycled along the top border */
+  top: string[];
+  /** emoji stamped in the corners */
+  corner: string;
+  /** path to official Mochi artwork shown bottom-right (never redrawn) */
+  mochi?: string;
+}
+
 export interface FrameInfo {
   id: FrameId;
   /** strip background color */
@@ -112,6 +122,7 @@ export interface FrameInfo {
   /** text color for the caption area */
   text: string;
   swatchClass: string;
+  decor?: FrameDecor;
 }
 
 export const FRAMES: FrameInfo[] = [
@@ -120,7 +131,28 @@ export const FRAMES: FrameInfo[] = [
   { id: "mint", bg: "#dff2da", text: "#5c7f53", swatchClass: "bg-mint-200" },
   { id: "lavender", bg: "#ece3ff", text: "#71619e", swatchClass: "bg-lav-200" },
   { id: "sky", bg: "#ddf0fe", text: "#4f7a99", swatchClass: "bg-skyy-200" },
-  { id: "night", bg: "#3b3650", text: "#f6effc", swatchClass: "bg-[#3b3650]" }
+  { id: "night", bg: "#3b3650", text: "#f6effc", swatchClass: "bg-[#3b3650]" },
+  {
+    id: "mochi-party",
+    bg: "#e9f5e1",
+    text: "#5c7f53",
+    swatchClass: "bg-mint-100",
+    decor: { top: ["💚", "🌸", "⭐"], corner: "🌷", mochi: "/mochi/mochi-excited.png" }
+  },
+  {
+    id: "hearts",
+    bg: "#ffe1ee",
+    text: "#a45a7c",
+    swatchClass: "bg-blossom-200",
+    decor: { top: ["💖", "💕", "🎀"], corner: "💝", mochi: "/mochi/mochi-waving.png" }
+  },
+  {
+    id: "stars",
+    bg: "#3b3650",
+    text: "#f6effc",
+    swatchClass: "bg-[#3b3650]",
+    decor: { top: ["⭐", "✨", "🌙"], corner: "✨", mochi: "/mochi/mochi-curious.png" }
+  }
 ];
 
 export const frameById = (id: FrameId) => FRAMES.find((f) => f.id === id) ?? FRAMES[0];
