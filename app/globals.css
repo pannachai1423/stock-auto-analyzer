@@ -91,6 +91,21 @@ body {
 .filter-vintage-film {
   filter: sepia(0.38) contrast(1.05) brightness(0.98) saturate(0.85);
 }
+.filter-peach-cream {
+  filter: brightness(1.09) contrast(0.9) saturate(1.12) hue-rotate(-9deg) sepia(0.07);
+}
+.filter-milk-tea {
+  filter: sepia(0.26) saturate(0.9) brightness(1.07) contrast(0.9);
+}
+.filter-cool-girl {
+  filter: brightness(1.06) contrast(1.02) saturate(0.82) hue-rotate(10deg);
+}
+.filter-y2k-flash {
+  filter: brightness(1.16) contrast(1.18) saturate(1.08);
+}
+.filter-mono-film {
+  filter: grayscale(1) contrast(1.08) brightness(1.06);
+}
 .filter-kawaii-pink {
   filter: brightness(1.08) saturate(1.25) hue-rotate(-12deg) contrast(0.93);
 }

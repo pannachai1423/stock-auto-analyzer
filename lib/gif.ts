@@ -3,6 +3,7 @@
 import { GIFEncoder, quantize, applyPalette } from "gifenc";
 import type { FilterId, FrameId } from "./types";
 import { filterById, frameById } from "./filters";
+import { applyFx } from "./strip";
 
 const GIF_W = 480;
 const PHOTO_H = 360;
@@ -58,6 +59,7 @@ export async function composeGif(opts: GifOptions): Promise<Blob> {
     if (supportsFilter && filter.css !== "none") ctx.filter = filter.css;
     ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, GIF_W, PHOTO_H);
     ctx.restore();
+    applyFx(ctx, canvas, 0, 0, GIF_W, PHOTO_H, filter.fx);
 
     // caption bar
     ctx.fillStyle = frame.text;

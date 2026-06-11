@@ -12,6 +12,8 @@ import { FILTERS, FRAMES, filterById, frameById } from "@/lib/filters";
 import { CATEGORIES } from "@/lib/categories";
 import { STICKERS, stickerByKey } from "@/lib/stickers";
 import { composeStrip, captureFrame, STRIP, stripHeight } from "@/lib/strip";
+import type { FilterFx } from "@/lib/filters";
+import type { BeautyLevel } from "@/lib/beauty";
 import { composeGif } from "@/lib/gif";
 import { shareImage } from "@/lib/share";
 import { sfx, isMuted, setMuted } from "@/lib/sounds";
@@ -21,6 +23,52 @@ import type { CategoryId, FilterId, FrameId, Memory, PlacedSticker } from "@/lib
 type Stage = "setup" | "capture" | "decorate" | "done";
 
 const COUNTDOWN_SECONDS = 3;
+
+const GRAIN_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23n)' opacity='0.65'/%3E%3C/svg%3E\")";
+
+/** live approximation of the film extras baked into the final strip */
+function FxOverlay({ fx, rounded }: { fx?: FilterFx; rounded?: number }) {
+  if (!fx) return null;
+  const radius = rounded ?? 0;
+  return (
+    <>
+      {fx.vignette && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            borderRadius: radius,
+            background: `radial-gradient(ellipse at center, rgba(30,16,26,0) 52%, rgba(30,16,26,${fx.vignette}) 100%)`
+          }}
+        />
+      )}
+      {fx.grain && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            borderRadius: radius,
+            backgroundImage: GRAIN_URI,
+            opacity: fx.grain,
+            mixBlendMode: "overlay"
+          }}
+        />
+      )}
+      {fx.glow && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            borderRadius: radius,
+            background: `radial-gradient(ellipse at center, rgba(255,250,240,${fx.glow * 0.4}) 0%, rgba(255,250,240,0) 65%)`,
+            mixBlendMode: "screen"
+          }}
+        />
+      )}
+    </>
+  );
+}
 
 /** pastel placeholder frames so the booth still works without a camera */
 function demoFrame(index: number): string {
@@ -77,6 +125,7 @@ export default function PhotoboothFlow() {
   const [savedMemory, setSavedMemory] = useState<Memory | null>(null);
   const [muted, setMutedState] = useState(false);
   const [gifBusy, setGifBusy] = useState(false);
+  const [beauty, setBeauty] = useState<BeautyLevel>(1);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -133,8 +182,8 @@ export default function PhotoboothFlow() {
     if (demoMode || !videoRef.current || !streamRef.current) {
       return demoFrame(Math.floor(Math.random() * 6));
     }
-    return captureFrame(videoRef.current, mirrored);
-  }, [demoMode, mirrored]);
+    return captureFrame(videoRef.current, mirrored, beauty);
+  }, [demoMode, mirrored, beauty]);
 
   const runCountdown = useCallback(
     () =>
@@ -532,6 +581,7 @@ export default function PhotoboothFlow() {
                     <p className="font-display text-cocoa">{t.booth.demoTitle}</p>
                   </div>
                 )}
+                <FxOverlay fx={filterInfo.fx} />
 
                 {cameraError && !demoMode && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-cream-100/95 p-6 text-center">
@@ -583,6 +633,27 @@ export default function PhotoboothFlow() {
                     {f.emoji} {t.filters[f.id]}
                   </button>
                 ))}
+              </div>
+
+              {/* beauty skin control */}
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+                <span className="font-display text-sm text-cocoa">{t.booth.beautyTitle}</span>
+                {([0, 1, 2] as const).map((lvl) => (
+                  <button
+                    key={lvl}
+                    onClick={() => setBeauty(lvl)}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                      beauty === lvl
+                        ? "border-mint-400 bg-mint-100 text-mint-600 shadow-plush scale-105"
+                        : "border-white/70 bg-white/60 hover:bg-white/90"
+                    }`}
+                  >
+                    {lvl === 0 ? t.booth.beautyOff : lvl === 1 ? t.booth.beautySoft : t.booth.beautyMax}
+                  </button>
+                ))}
+                <span className="w-full text-center text-[11px] text-cocoaSoft">
+                  {t.booth.beautyHint}
+                </span>
               </div>
             </div>
 
@@ -695,13 +766,9 @@ export default function PhotoboothFlow() {
                 }}
               >
                 {photos.slice(0, layout).map((p, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <div
                     key={i}
-                    src={p}
-                    alt=""
-                    draggable={false}
-                    className={`absolute object-cover ${filterInfo.className}`}
+                    className="absolute overflow-hidden"
                     style={{
                       left: STRIP.pad * previewScale,
                       top: (STRIP.pad + i * (photoH + STRIP.gap)) * previewScale,
@@ -709,7 +776,16 @@ export default function PhotoboothFlow() {
                       height: photoH * previewScale,
                       borderRadius: 10
                     }}
-                  />
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p}
+                      alt=""
+                      draggable={false}
+                      className={`h-full w-full object-cover ${filterInfo.className}`}
+                    />
+                    <FxOverlay fx={filterInfo.fx} rounded={10} />
+                  </div>
                 ))}
                 <div
                   className="absolute inset-x-0 text-center"

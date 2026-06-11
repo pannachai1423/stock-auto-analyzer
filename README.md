@@ -29,7 +29,9 @@ In the app, Mochi:
 | Feature | Status |
 | --- | --- |
 | Korean photobooth — front/rear camera, live preview, countdown, auto-capture, 4 & 6 photo strips, per-photo retake | ✅ |
-| 7 real-time filters (Korean Beauty, Soft Skin, Dreamy Glow, Fairy Glow, Vintage Film, Kawaii Pink, Anime Style) | ✅ |
+| 13 real-time filters (Korean Beauty, Soft Skin, Peach Cream, Milk Tea, Dreamy Glow, Fairy Glow, Kawaii Pink, Cool Girl, Y2K Flash, Vintage Film, Mono Film, Anime Style…) | ✅ |
+| ✨ Real skin smoothing (3 levels) — YCbCr skin-zone detection, eyes/lips/hair stay sharp | ✅ |
+| 🎞️ Film effects baked into strips & GIFs — grain, vignette, soft glow per filter | ✅ |
 | Drag-and-drop decoration — hearts, stars, bows, flowers, official Mochi stickers, titles, date stamps, 6 frame colors | ✅ |
 | Strip download (composited keepsake JPEG) | ✅ |
 | 🎬 GIF memory movies — the strip becomes a looping mini-film | ✅ |

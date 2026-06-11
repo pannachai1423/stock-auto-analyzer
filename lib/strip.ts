@@ -1,8 +1,9 @@
 "use client";
 
 import type { FilterId, FrameId, PlacedSticker } from "./types";
-import { filterById, frameById } from "./filters";
+import { filterById, frameById, type FilterFx } from "./filters";
 import { stickerByKey } from "./stickers";
+import { smoothSkin, type BeautyLevel } from "./beauty";
 
 /** Geometry for a photo strip. All sizes in canvas pixels. */
 export const STRIP = {
@@ -42,6 +43,82 @@ function drawCover(
   const sx = (img.width - sw) / 2;
   const sy = (img.height - sh) / 2;
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+let grainTile: HTMLCanvasElement | null = null;
+
+/** small noise tile reused as a repeating film-grain pattern */
+function getGrainTile(): HTMLCanvasElement {
+  if (grainTile) return grainTile;
+  const tile = document.createElement("canvas");
+  tile.width = tile.height = 128;
+  const tctx = tile.getContext("2d")!;
+  const img = tctx.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 110 + Math.random() * 90;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  tctx.putImageData(img, 0, 0);
+  grainTile = tile;
+  return tile;
+}
+
+/** Applies film-style extras (glow, grain, vignette) over a photo rect. */
+export function applyFx(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fx: FilterFx | undefined
+) {
+  if (!fx) return;
+
+  if (fx.glow && typeof ctx.filter === "string") {
+    // soft bloom: screen-blend a blurred copy of the photo over itself
+    const tmp = document.createElement("canvas");
+    tmp.width = w;
+    tmp.height = h;
+    const tctx = tmp.getContext("2d");
+    if (tctx) {
+      tctx.filter = `blur(${Math.max(4, Math.round(w / 70))}px) brightness(1.1)`;
+      tctx.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = fx.glow;
+      ctx.drawImage(tmp, x, y);
+      ctx.restore();
+    }
+  }
+
+  if (fx.grain) {
+    ctx.save();
+    ctx.globalCompositeOperation = "overlay";
+    ctx.globalAlpha = fx.grain;
+    ctx.fillStyle = ctx.createPattern(getGrainTile(), "repeat")!;
+    ctx.translate(x, y);
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  if (fx.vignette) {
+    const grad = ctx.createRadialGradient(
+      x + w / 2,
+      y + h / 2,
+      Math.min(w, h) * 0.42,
+      x + w / 2,
+      y + h / 2,
+      Math.max(w, h) * 0.72
+    );
+    grad.addColorStop(0, "rgba(30,16,26,0)");
+    grad.addColorStop(1, `rgba(30,16,26,${fx.vignette})`);
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
+  }
 }
 
 function roundedRectPath(
@@ -99,6 +176,8 @@ export async function composeStrip(opts: ComposeOptions): Promise<string> {
     ctx.clip();
     if (supportsFilter && filter.css !== "none") ctx.filter = filter.css;
     drawCover(ctx, img, pad, y, photoW, photoH);
+    ctx.filter = "none";
+    applyFx(ctx, canvas, pad, y, photoW, photoH, filter.fx);
     ctx.restore();
   });
 
@@ -140,8 +219,12 @@ export async function composeStrip(opts: ComposeOptions): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-/** Captures the current video frame into a data URL (unfiltered). */
-export function captureFrame(video: HTMLVideoElement, mirrored: boolean): string {
+/** Captures the current video frame (with optional skin smoothing) into a data URL. */
+export function captureFrame(
+  video: HTMLVideoElement,
+  mirrored: boolean,
+  beauty: BeautyLevel = 0
+): string {
   const canvas = document.createElement("canvas");
   const w = Math.min(video.videoWidth || 640, 960);
   const h = Math.round(w * (video.videoHeight / video.videoWidth || 0.75));
@@ -154,5 +237,7 @@ export function captureFrame(video: HTMLVideoElement, mirrored: boolean): string
     ctx.scale(-1, 1);
   }
   ctx.drawImage(video, 0, 0, w, h);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  smoothSkin(canvas, ctx, beauty);
   return canvas.toDataURL("image/jpeg", 0.9);
 }

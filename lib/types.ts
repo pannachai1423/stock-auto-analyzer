@@ -2,10 +2,15 @@ export type FilterId =
   | "none"
   | "korean-beauty"
   | "soft-skin"
+  | "peach-cream"
+  | "milk-tea"
   | "dreamy-glow"
   | "fairy-glow"
-  | "vintage-film"
   | "kawaii-pink"
+  | "cool-girl"
+  | "y2k-flash"
+  | "vintage-film"
+  | "mono-film"
   | "anime-style";
 
 export type FrameId = "cream" | "pink" | "mint" | "lavender" | "sky" | "night";
