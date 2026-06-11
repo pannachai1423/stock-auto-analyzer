@@ -38,6 +38,7 @@
 <body>
 <div id="rotate">📱<br>หมุนเครื่องเป็นแนวนอน<br>เพื่อเล่นเกม</div>
 <canvas id="game"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 "use strict";
 
@@ -133,7 +134,7 @@ function canvasPos(clientX, clientY) {
 
 function setupTouchControls() {
   for (const k in touchCtl) delete touchCtl[k];
-  const humans = players.filter(p => !p.isBot);
+  const humans = players.filter(p => !p.isBot && !p.remote);
   humans.forEach((p, i) => {
     const split = humans.length >= 2; // 2 คนแบ่งจอซ้าย-ขวา
     touchCtl[p.idx] = {
@@ -181,15 +182,14 @@ function gameTouchUp(id) {
 }
 
 function onTap(pos) {
-  if (state === "menu") {
-    for (const b of menuButtons) {
-      if (b.slots && pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) {
-        startMatch(b.slots);
-        return;
-      }
+  for (const b of menuButtons) {
+    if (b.action && pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) {
+      b.action();
+      return;
     }
-  } else if (state === "roundOver") startRound();
-  else if (state === "champion") state = "menu";
+  }
+  if (state === "roundOver" && net.mode !== "guest") startRound();
+  else if (state === "champion" && net.mode !== "guest") leaveChampion();
 }
 
 canvas.addEventListener("pointerdown", e => {
@@ -205,6 +205,213 @@ window.addEventListener("pointermove", e => {
 });
 window.addEventListener("pointerup", e => gameTouchUp(e.pointerId));
 window.addEventListener("pointercancel", e => gameTouchUp(e.pointerId));
+
+/* ---------------- ออนไลน์ (WebRTC ผ่าน PeerJS) ----------------
+   โฮสต์เป็นคนรันเกมจริง ผู้เล่นทางไกลส่งปุ่มกดมา
+   โฮสต์ส่ง snapshot สนามกลับ 30 ครั้ง/วินาที                     */
+const net = {
+  mode: "local",            // local | host | guest
+  peer: null, conns: [], conn: null,
+  roomCode: "", myIdx: 0,
+  inputs: {},               // idx -> อินพุตล่าสุดจากผู้เล่นทางไกล
+  fxQueue: [],              // เอฟเฟกต์/เสียง รอแนบไปกับ snapshot
+  lastSnap: null, prevSnap: null, snapTime: 0, prevSnapTime: 0,
+  trails: {}, dashPending: false,
+};
+
+function resetNet() {
+  try { if (net.peer) net.peer.destroy(); } catch (e) {}
+  net.mode = "local"; net.peer = null; net.conns = []; net.conn = null;
+  net.roomCode = ""; net.myIdx = 0; net.inputs = {}; net.fxQueue = [];
+  net.lastSnap = null; net.prevSnap = null; net.trails = {}; net.dashPending = false;
+}
+
+// ห่อ SFX ให้ส่งเสียงไปเล่นฝั่ง guest ด้วย
+for (const name in SFX) {
+  const orig = SFX[name];
+  SFX[name] = () => { orig(); if (net.mode === "host") net.fxQueue.push(["sfx", name]); };
+}
+
+function makeRoomCode() {
+  const c = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // ตัดตัวที่อ่านสับสน (0/O, 1/I/L)
+  let s = "";
+  for (let i = 0; i < 5; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+
+function hostRoom() {
+  if (typeof Peer === "undefined") { alert("โหลดระบบออนไลน์ไม่ได้ — ต้องต่ออินเทอร์เน็ตตอนเปิดเกม"); return; }
+  resetNet();
+  net.mode = "host"; net.roomCode = makeRoomCode();
+  state = "lobby";
+  net.peer = new Peer("arena-th-" + net.roomCode);
+  net.peer.on("error", err => {
+    if (state === "lobby") { alert("สร้างห้องไม่สำเร็จ (" + err.type + ") ลองอีกครั้ง"); resetNet(); state = "menu"; }
+  });
+  net.peer.on("connection", conn => {
+    if (net.conns.length >= 3 || state !== "lobby") { conn.on("open", () => conn.close()); return; }
+    net.conns.push(conn);
+    conn.on("data", d => onHostData(conn, d));
+    conn.on("close", () => onGuestLeft(conn));
+  });
+}
+
+function joinRoom() {
+  if (typeof Peer === "undefined") { alert("โหลดระบบออนไลน์ไม่ได้ — ต้องต่ออินเทอร์เน็ตตอนเปิดเกม"); return; }
+  const code = (prompt("ใส่รหัสห้อง 5 ตัวที่ได้จากเพื่อน:") || "").trim().toUpperCase();
+  if (!code) return;
+  resetNet();
+  net.mode = "guest"; state = "joining";
+  net.peer = new Peer();
+  net.peer.on("error", err => {
+    if (net.mode === "guest") { alert("เข้าห้องไม่สำเร็จ (" + err.type + ") — เช็ครหัสห้องอีกที"); resetNet(); state = "menu"; }
+  });
+  net.peer.on("open", () => {
+    net.conn = net.peer.connect("arena-th-" + code, { reliable: true });
+    net.conn.on("open", () => { state = "guestLobby"; });
+    net.conn.on("data", onGuestData);
+    net.conn.on("close", () => {
+      if (net.mode === "guest") { alert("ห้องถูกปิดแล้ว"); resetNet(); state = "menu"; }
+    });
+  });
+}
+
+function endOnline() {
+  const peer = net.peer;
+  net.conns.forEach(c => { try { if (c.open) c.send({ t: "end" }); } catch (e) {} });
+  net.peer = null;
+  resetNet();
+  setTimeout(() => { try { if (peer) peer.destroy(); } catch (e) {} }, 500);
+}
+
+function startOnlineMatch() {
+  startMatch(["h", ...net.conns.map(() => "r")]);
+  net.inputs = {};
+  net.conns.forEach((c, i) => {
+    c.playerIdx = i + 1;
+    if (c.open) c.send({ t: "start", idx: i + 1, n: players.length, walls });
+  });
+}
+
+function onHostData(conn, d) {
+  if (d && d.t === "i" && conn.playerIdx !== undefined) {
+    const inp = net.inputs[conn.playerIdx] || (net.inputs[conn.playerIdx] = { dx: 0, dy: 0, shoot: 0, dash: 0 });
+    inp.dx = d.dx || 0; inp.dy = d.dy || 0; inp.shoot = d.s; inp.dash = inp.dash || d.d;
+  }
+}
+
+function onGuestLeft(conn) {
+  const i = net.conns.indexOf(conn);
+  if (i >= 0) net.conns.splice(i, 1);
+  if (conn.playerIdx !== undefined) {
+    const p = players[conn.playerIdx];
+    if (p && p.alive && state === "playing") {
+      addFloatText(p.x, p.y - 40, p.def.name + " หลุดออกจากเกม!", "#ffffff");
+      killPlayer(p, -1);
+    } else if (p) p.alive = false;
+  }
+}
+
+function onGuestData(d) {
+  if (!d) return;
+  if (d.t === "start" || d.t === "round") {
+    if (d.t === "start") {
+      net.myIdx = d.idx; numPlayers = d.n;
+      for (const k in touchCtl) delete touchCtl[k];
+      touchCtl[net.myIdx] = { zone: { x0: 0, x1: W }, btnX: 110, btnY: H - 110, active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0, dash: false };
+    }
+    walls = d.walls;
+    bullets = []; powerups = []; particles = []; floatTexts = []; net.trails = {};
+    net.lastSnap = null; net.prevSnap = null;
+    state = "countdown"; countdownT = 180;
+  } else if (d.t === "snap") {
+    net.prevSnap = net.lastSnap; net.prevSnapTime = net.snapTime;
+    net.lastSnap = d; net.snapTime = performance.now();
+    for (const fx of d.fx) applyFx(fx);
+  } else if (d.t === "lobby") {
+    net.lastSnap = null; net.prevSnap = null;
+    state = "guestLobby";
+  } else if (d.t === "end") {
+    alert("โฮสต์ปิดห้องแล้ว"); resetNet(); state = "menu";
+  }
+}
+
+function applyFx(fx) {
+  if (fx[0] === "sfx") { const f = SFX[fx[1]]; if (f) f(); }
+  else if (fx[0] === "ex") explode(fx[1], fx[2], fx[3], fx[4], fx[5]);
+  else if (fx[0] === "ft") addFloatText(fx[1], fx[2], fx[3], fx[4]);
+}
+
+function hostNetTick() {
+  if (frame % 2 !== 0 || !net.conns.length) return;
+  const snap = {
+    t: "snap", state, cd: countdownT, shake: Math.round(shake),
+    win: roundWinner ? roundWinner.idx : -1,
+    champ: champion ? champion.idx : -1,
+    ps: players.map(p => [p.idx, Math.round(p.x), Math.round(p.y), +p.aimX.toFixed(2), +p.aimY.toFixed(2),
+      Math.max(0, Math.round(p.hp)), p.alive ? 1 : 0, p.wins, p.dashLeft > 0 ? 1 : 0, p.dashCd, Object.keys(p.buffs).join(","), p.hitFlash]),
+    bs: bullets.map(b => [Math.round(b.x), Math.round(b.y), b.r, b.owner, +b.vx.toFixed(1), +b.vy.toFixed(1)]),
+    us: powerups.map(u => [Math.round(u.x), Math.round(u.y), u.def.id]),
+    fx: net.fxQueue.splice(0),
+  };
+  for (const c of net.conns) { try { if (c.open) c.send(snap); } catch (e) {} }
+}
+
+/* ฝั่ง guest: ประกอบโลกขึ้นจาก snapshot ล่าสุด + interpolate ให้ลื่น */
+function applySnapToWorld() {
+  const s = net.lastSnap;
+  if (!s) return;
+  state = s.state;
+  countdownT = s.cd;
+  if (s.shake > shake) shake = s.shake;
+  const now = performance.now();
+  const dt = Math.max(16, net.snapTime - (net.prevSnapTime || net.snapTime - 33));
+  const a = Math.min(1, (now - net.snapTime) / dt);
+  const prevMap = {};
+  if (net.prevSnap) for (const q of net.prevSnap.ps) prevMap[q[0]] = q;
+  players = s.ps.map(q => {
+    const idx = q[0], pv = prevMap[idx];
+    let x = q[1], y = q[2];
+    if (pv) { x = pv[1] + (q[1] - pv[1]) * a; y = pv[2] + (q[2] - pv[2]) * a; }
+    const buffs = {};
+    if (q[10]) q[10].split(",").forEach(b => { buffs[b] = 100; });
+    const trail = net.trails[idx] || (net.trails[idx] = []);
+    if (q[8]) trail.push({ x, y, life: 14 });
+    return { idx, def: PLAYER_DEFS[idx], x, y, aimX: q[3], aimY: q[4], hp: q[5], alive: !!q[6],
+      wins: q[7], dashLeft: q[8], dashCd: q[9], buffs, hitFlash: q[11], isBot: false, remote: idx !== net.myIdx, trail };
+  });
+  const elapsed = (now - net.snapTime) / 16.7;
+  bullets = s.bs.map(b => ({ x: b[0] + b[4] * elapsed, y: b[1] + b[5] * elapsed, r: b[2], owner: b[3], color: PLAYER_DEFS[b[3]].color }));
+  powerups = s.us.map(u => ({ x: u[0], y: u[1], def: POWERUPS.find(p => p.id === u[2]), born: 0 }));
+  roundWinner = s.win >= 0 ? players.find(p => p.idx === s.win) : null;
+  champion = s.champ >= 0 ? players.find(p => p.idx === s.champ) : null;
+  numPlayers = players.length;
+}
+
+/* ฝั่ง guest: อ่านปุ่มของตัวเอง (ใช้ชุดปุ่ม P1 หรือจอยทัช) แล้วส่งให้โฮสต์ */
+function sendGuestInput() {
+  const k = PLAYER_DEFS[0].keys;
+  let dx = 0, dy = 0;
+  if (keys[k.up]) dy -= 1;
+  if (keys[k.down]) dy += 1;
+  if (keys[k.left]) dx -= 1;
+  if (keys[k.right]) dx += 1;
+  let shoot = !!keys[k.shoot];
+  let dash = !!keys[k.dash];
+  const tc = touchCtl[net.myIdx];
+  if (tc) {
+    if (tc.active) { dx = tc.dx; dy = tc.dy; }
+    if (tc.dash) { dash = true; tc.dash = false; }
+    if (touchMode) shoot = true;
+  }
+  if (dash) net.dashPending = true;
+  if (frame % 3 === 0 && net.conn && net.conn.open) {
+    try {
+      net.conn.send({ t: "i", dx: +dx.toFixed(2), dy: +dy.toFixed(2), s: shoot ? 1 : 0, d: net.dashPending ? 1 : 0 });
+      net.dashPending = false;
+    } catch (e) {}
+  }
+}
 
 /* ---------------- ค่าผู้เล่น ---------------- */
 const PLAYER_DEFS = [
@@ -317,11 +524,12 @@ const SPAWNS = [
   [100, 100], [W - 100, H - 100], [W - 100, 100], [100, H - 100],
 ];
 
-function makePlayer(i, isBot) {
+// type: "h" = คนเครื่องนี้, "b" = บอท, "r" = ผู้เล่นออนไลน์ทางไกล
+function makePlayer(i, type) {
   const def = PLAYER_DEFS[i];
   return {
     idx: i, def,
-    isBot: !!isBot, botInput: null,
+    isBot: type === "b", remote: type === "r", botInput: null,
     x: SPAWNS[i][0], y: SPAWNS[i][1],
     vx: 0, vy: 0,
     aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
@@ -336,10 +544,10 @@ function makePlayer(i, isBot) {
   };
 }
 
-// slots: อาร์เรย์ของ "h" (คน) หรือ "b" (บอท) เช่น ["h","b"]
+// slots: อาร์เรย์ของ "h" / "b" / "r" เช่น ["h","b"] หรือ ["h","r","r"]
 function startMatch(slots) {
   numPlayers = slots.length;
-  players = slots.map((s, i) => makePlayer(i, s === "b"));
+  players = slots.map((s, i) => makePlayer(i, s));
   champion = null;
   setupTouchControls();
   startRound();
@@ -365,6 +573,9 @@ function startRound() {
   nextPowerupAt = frame + rand(CFG.powerupEvery[0], CFG.powerupEvery[1]);
   countdownT = 180;
   state = "countdown";
+  if (net.mode === "host") {
+    net.conns.forEach(c => { try { if (c.open) c.send({ t: "round", walls }); } catch (e) {} });
+  }
   SFX.round();
 }
 
@@ -404,9 +615,11 @@ function spawnParticle(x, y, color, speed, life) {
 }
 function explode(x, y, color, count, speed) {
   for (let i = 0; i < count; i++) spawnParticle(x, y, color, speed || 5, rand(20, 50));
+  if (net.mode === "host") net.fxQueue.push(["ex", Math.round(x), Math.round(y), color, count, speed || 5]);
 }
 function addFloatText(x, y, text, color) {
   floatTexts.push({ x, y, text, color, life: 60 });
+  if (net.mode === "host") net.fxQueue.push(["ft", Math.round(x), Math.round(y), text, color]);
 }
 
 /* ---------------- อัปเดตหลัก ---------------- */
@@ -416,16 +629,36 @@ function onKeyPress(code) {
     if (code === "Digit2") { startMatch(["h", "h"]); }
     if (code === "Digit3") { startMatch(["h", "h", "h"]); }
     if (code === "Digit4") { startMatch(["h", "h", "h", "h"]); }
+  } else if (state === "lobby") {
+    if (code === "Space" && net.conns.length >= 1) startOnlineMatch();
+    if (code === "Escape") { endOnline(); state = "menu"; }
   } else if (state === "roundOver") {
-    if (code === "Space") startRound();
+    if (code === "Space" && net.mode !== "guest") startRound();
   } else if (state === "champion") {
-    if (code === "Space") { state = "menu"; }
+    if (code === "Space" && net.mode !== "guest") leaveChampion();
+  }
+}
+
+// จบแมตช์: โฮสต์กลับห้องรอ (เล่นรีแมตช์ได้) โหมดอื่นกลับเมนู
+function leaveChampion() {
+  if (net.mode === "host") {
+    state = "lobby";
+    net.conns.forEach(c => { try { if (c.open) c.send({ t: "lobby" }); } catch (e) {} });
+  } else {
+    state = "menu";
   }
 }
 
 /* รวมอินพุตจากคีย์บอร์ด / จอยทัช / บอท เป็นรูปแบบเดียว */
 function getInput(p) {
   if (p.isBot) return p.botInput || { dx: 0, dy: 0, shoot: false, dash: false };
+  if (p.remote) {
+    const ri = net.inputs[p.idx];
+    if (!ri) return { dx: 0, dy: 0, shoot: false, dash: false };
+    const out = { dx: ri.dx, dy: ri.dy, shoot: !!ri.shoot, dash: !!ri.dash };
+    ri.dash = 0; // dash เป็นจังหวะเดียว ใช้แล้วเคลียร์
+    return out;
+  }
   const k = p.def.keys;
   let dx = 0, dy = 0;
   if (keys[k.up]) dy -= 1;
@@ -480,6 +713,17 @@ function updateBotAI(p) {
   }
   const gl = Math.hypot(gx, gy) || 1;
   inp.dx = gx / gl; inp.dy = gy / gl;
+
+  // กันบอทเดินติดกำแพง/มุม: ถ้าแทบไม่ขยับมาพักนึง สุ่มทิศเดินใหม่ชั่วครู่
+  const bp = p.botMem || (p.botMem = { x: p.x, y: p.y, wanderT: 0, wanderA: 0 });
+  if (bp.wanderT > 0) {
+    bp.wanderT--;
+    inp.dx = Math.cos(bp.wanderA); inp.dy = Math.sin(bp.wanderA);
+  }
+  if (frame % 30 === 0) {
+    if (dist2(p.x, p.y, bp.x, bp.y) < 30 * 30) { bp.wanderT = 50; bp.wanderA = Math.random() * Math.PI * 2; }
+    bp.x = p.x; bp.y = p.y;
+  }
 
   // เล็งใส่เป้า มีพลาดเล็กน้อยให้คนพอสู้ไหว ยิงเมื่อไม่มีกำแพงบัง
   const aimAng = Math.atan2(target.y - p.y, target.x - p.x) + (Math.random() - 0.5) * 0.16;
@@ -670,6 +914,21 @@ function updatePowerups() {
 function update() {
   frame++;
   if (shake > 0) shake *= 0.88;
+
+  // guest ไม่จำลองเกมเอง: ประกอบโลกจาก snapshot + ส่งปุ่มกดให้โฮสต์
+  if (net.mode === "guest") {
+    if (["countdown", "playing", "roundOver", "champion"].includes(state)) {
+      applySnapToWorld();
+      sendGuestInput();
+      for (const idx in net.trails) net.trails[idx] = net.trails[idx].filter(t => --t.life > 0);
+      particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vx *= 0.95; pt.vy *= 0.95; pt.life--; });
+      particles = particles.filter(pt => pt.life > 0);
+      floatTexts.forEach(t => { t.y -= 0.8; t.life--; });
+      floatTexts = floatTexts.filter(t => t.life > 0);
+    }
+    return;
+  }
+  if (net.mode === "host" && state !== "lobby") hostNetTick();
 
   if (state === "countdown") {
     countdownT--;
@@ -895,65 +1154,169 @@ function drawMenu() {
   // ปุ่มเลือกโหมด (แตะ/คลิก หรือกดเลข 1-4)
   menuButtons = [];
   const modes = [
-    { label: "🤖  1 คน — ปะทะบอท", slots: ["h", "b"], color: "#88ffaa" },
-    { label: "👥  2 คน — จอเดียวกัน", slots: ["h", "h"], color: "#55aaff" },
-    { label: "⚔  2 คน + บอท 2 ตัว", slots: ["h", "h", "b", "b"], color: "#ffcc44" },
+    { label: "🤖  1 คน ปะทะบอท", color: "#88ffaa", action: () => startMatch(["h", "b"]) },
+    { label: "👥  2 คน จอเดียวกัน", color: "#55aaff", action: () => startMatch(["h", "h"]) },
+    { label: "⚔  2 คน + บอท 2 ตัว", color: "#ffcc44", action: () => startMatch(["h", "h", "b", "b"]) },
+    { label: "🌐  สร้างห้องออนไลน์", color: "#ff88ff", action: hostRoom },
+    { label: "🌐  เข้าห้องเพื่อน (ใส่รหัส)", color: "#88ffff", action: joinRoom },
   ];
   ctx.textAlign = "center";
-  const bw = 460, bh = 56, gap = 14;
-  let by = 250;
-  for (const m of modes) {
-    const bx = W / 2 - bw / 2;
-    menuButtons.push({ x: bx, y: by, w: bw, h: bh, slots: m.slots });
+  const bw = 310, bh = 56;
+  modes.forEach((m, i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const bx = i === 4 ? W / 2 - bw / 2 : W / 2 - bw - 10 + col * (bw + 20);
+    const y = 240 + row * 70;
+    menuButtons.push({ x: bx, y, w: bw, h: bh, action: m.action });
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    roundRect(bx, by, bw, bh, 14); ctx.fill();
+    roundRect(bx, y, bw, bh, 14); ctx.fill();
     ctx.strokeStyle = m.color; ctx.lineWidth = 2;
-    roundRect(bx, by, bw, bh, 14); ctx.stroke();
+    roundRect(bx, y, bw, bh, 14); ctx.stroke();
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 24px sans-serif";
-    ctx.fillText(m.label, W / 2, by + 37);
-    by += bh + gap;
-  }
+    ctx.font = "bold 21px sans-serif";
+    ctx.fillText(m.label, bx + bw / 2, y + 36);
+  });
+  let by = 240 + 2 * 70 + bh; // ขอบล่างของปุ่มแถวสุดท้าย
 
   if (touchMode) {
     ctx.fillStyle = "#99aadd";
     ctx.font = "19px sans-serif";
-    ctx.fillText("📱 ลากนิ้วฝั่งของตัวเอง = เดิน+เล็ง (ยิงอัตโนมัติ)  •  ปุ่ม ⚡ มุมล่าง = พุ่งหลบ", W / 2, by + 35);
+    ctx.fillText("📱 ลากนิ้วฝั่งของตัวเอง = เดิน+เล็ง (ยิงอัตโนมัติ)  •  ปุ่ม ⚡ มุมล่าง = พุ่งหลบ", W / 2, by + 42);
     ctx.fillStyle = "#667";
     ctx.font = "17px sans-serif";
-    ctx.fillText("ชนะ 5 รอบ = แชมป์ 👑  •  กระสุนสะท้อนกำแพงได้ 1 ครั้ง", W / 2, by + 68);
+    ctx.fillText("ออนไลน์: คนนึงสร้างห้องแล้วบอกรหัส 5 ตัวให้เพื่อนเข้าร่วม (สูงสุด 4 คน)", W / 2, by + 75);
+    ctx.fillText("ชนะ 5 รอบ = แชมป์ 👑  •  กระสุนสะท้อนกำแพงได้ 1 ครั้ง", W / 2, by + 105);
   } else {
     ctx.fillStyle = "#99aadd";
-    ctx.font = "18px sans-serif";
-    ctx.fillText("คีย์บอร์ด: กดเลข [1] [2] [3] [4] เลือกโหมดได้ (3-4 = สามและสี่คน)", W / 2, by + 32);
+    ctx.font = "17px sans-serif";
+    ctx.fillText("คีย์บอร์ด: กดเลข [1] [2] [3] [4] เลือกโหมดในเครื่อง  •  ออนไลน์: สร้างห้องแล้วบอกรหัสให้เพื่อน", W / 2, by + 38);
     // การ์ดปุ่มของแต่ละคน
-    const y0 = by + 85;
+    const y0 = by + 88;
     for (let i = 0; i < 4; i++) {
       const def = PLAYER_DEFS[i];
       const x = W / 2 - 480 + i * 240 + 120;
       ctx.fillStyle = "rgba(255,255,255,0.05)";
-      roundRect(x - 110, y0 - 25, 220, 108, 12); ctx.fill();
+      roundRect(x - 110, y0 - 25, 220, 104, 12); ctx.fill();
       ctx.strokeStyle = def.color; ctx.lineWidth = 2;
-      roundRect(x - 110, y0 - 25, 220, 108, 12); ctx.stroke();
+      roundRect(x - 110, y0 - 25, 220, 104, 12); ctx.stroke();
       ctx.fillStyle = def.color;
-      ctx.font = "bold 20px sans-serif";
+      ctx.font = "bold 19px sans-serif";
       ctx.fillText(def.name, x, y0);
       ctx.fillStyle = "#ccccdd";
       ctx.font = "13px sans-serif";
-      def.help.split(" | ").forEach((ln, li) => ctx.fillText(ln, x, y0 + 24 + li * 20));
+      def.help.split(" | ").forEach((ln, li) => ctx.fillText(ln, x, y0 + 23 + li * 19));
     }
   }
 
   ctx.fillStyle = "#556";
   ctx.font = "16px sans-serif";
-  ctx.fillText("ไอเทม:  ⋔ ยิงสามทาง   ● กระสุนยักษ์   ⚡ สปีดสายฟ้า   ◈ โล่   ✚ ฮีล", W / 2, H - 22);
+  ctx.fillText("ไอเทม:  ⋔ ยิงสามทาง   ● กระสุนยักษ์   ⚡ สปีดสายฟ้า   ◈ โล่   ✚ ฮีล", W / 2, H - 18);
+}
+
+/* ---------------- หน้าจอออนไลน์ ---------------- */
+function drawLobby() {
+  drawBackground();
+  menuButtons = [];
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 44px sans-serif";
+  ctx.shadowColor = "#ff88ff"; ctx.shadowBlur = 20;
+  ctx.fillText("🌐 ห้องออนไลน์", W / 2, 110);
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = "#8899cc";
+  ctx.font = "21px sans-serif";
+  ctx.fillText('บอกรหัสนี้ให้เพื่อน แล้วให้เพื่อนกด "เข้าห้องเพื่อน (ใส่รหัส)" จากหน้าเมนู', W / 2, 165);
+
+  // กล่องรหัสห้อง
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  roundRect(W / 2 - 220, 195, 440, 105, 16); ctx.fill();
+  ctx.strokeStyle = "#ff88ff"; ctx.lineWidth = 2;
+  roundRect(W / 2 - 220, 195, 440, 105, 16); ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 62px monospace";
+  ctx.fillText(net.roomCode.split("").join(" "), W / 2, 272);
+
+  // ผู้เล่นในห้อง
+  const n = 1 + net.conns.length;
+  ctx.font = "bold 23px sans-serif";
+  ctx.fillStyle = "#ccccdd";
+  ctx.fillText("ผู้เล่นในห้อง  " + n + " / 4", W / 2, 360);
+  for (let i = 0; i < 4; i++) {
+    const x = W / 2 - 135 + i * 90;
+    const joined = i < n;
+    ctx.globalAlpha = joined ? 1 : 0.22;
+    ctx.fillStyle = PLAYER_DEFS[i].color;
+    ctx.beginPath(); ctx.arc(x, 408, 24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#0a0a14";
+    ctx.font = "bold 15px sans-serif";
+    ctx.fillText(joined ? PLAYER_DEFS[i].name : "?", x, 414);
+    ctx.globalAlpha = 1;
+  }
+  const dots = ".".repeat(1 + (Math.floor(frame / 25) % 3));
+  ctx.fillStyle = "#667";
+  ctx.font = "18px sans-serif";
+  ctx.fillText(net.conns.length ? "เพื่อนมาแล้ว! พร้อมเมื่อไหร่ก็กดเริ่มเลย" : "กำลังรอเพื่อนเข้าห้อง" + dots, W / 2, 470);
+
+  // ปุ่มเริ่ม / ยกเลิก
+  const ready = net.conns.length >= 1;
+  ctx.globalAlpha = ready ? 1 : 0.35;
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  roundRect(W / 2 - 170, 505, 340, 58, 14); ctx.fill();
+  ctx.strokeStyle = "#88ffaa"; ctx.lineWidth = 2;
+  roundRect(W / 2 - 170, 505, 340, 58, 14); ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 26px sans-serif";
+  ctx.fillText("▶  เริ่มเกม", W / 2, 543);
+  ctx.globalAlpha = 1;
+  menuButtons.push({ x: W / 2 - 170, y: 505, w: 340, h: 58, action: () => { if (net.conns.length >= 1) startOnlineMatch(); } });
+
+  ctx.fillStyle = "#778";
+  ctx.font = "20px sans-serif";
+  ctx.fillText("ยกเลิก / ปิดห้อง", W / 2, 625);
+  menuButtons.push({ x: W / 2 - 110, y: 598, w: 220, h: 40, action: () => { endOnline(); state = "menu"; } });
+}
+
+function drawJoining() {
+  drawBackground();
+  menuButtons = [];
+  ctx.textAlign = "center";
+  const dots = ".".repeat(1 + (Math.floor(frame / 20) % 3));
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 36px sans-serif";
+  ctx.fillText("🌐 กำลังเชื่อมต่อ" + dots, W / 2, H / 2 - 20);
+  ctx.fillStyle = "#778";
+  ctx.font = "20px sans-serif";
+  ctx.fillText("ยกเลิก", W / 2, H / 2 + 70);
+  menuButtons.push({ x: W / 2 - 80, y: H / 2 + 43, w: 160, h: 40, action: () => { resetNet(); state = "menu"; } });
+}
+
+function drawGuestLobby() {
+  drawBackground();
+  menuButtons = [];
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#88ffaa";
+  ctx.font = "bold 40px sans-serif";
+  ctx.fillText("✓ เข้าห้องแล้ว!", W / 2, H / 2 - 70);
+  const dots = ".".repeat(1 + (Math.floor(frame / 25) % 3));
+  ctx.fillStyle = "#ccccdd";
+  ctx.font = "24px sans-serif";
+  ctx.fillText("รอโฮสต์กดเริ่มเกม" + dots, W / 2, H / 2 - 10);
+  ctx.fillStyle = "#667";
+  ctx.font = "18px sans-serif";
+  ctx.fillText(touchMode
+    ? "พอเริ่มแล้ว: ลากนิ้ว = เดิน+เล็ง (ยิงออโต้) • ปุ่ม ⚡ = พุ่งหลบ"
+    : "พอเริ่มแล้ว: W A S D เดิน • F ยิง • G พุ่ง", W / 2, H / 2 + 35);
+  ctx.fillStyle = "#778";
+  ctx.font = "20px sans-serif";
+  ctx.fillText("ออกจากห้อง", W / 2, H / 2 + 120);
+  menuButtons.push({ x: W / 2 - 100, y: H / 2 + 93, w: 200, h: 40, action: () => { resetNet(); state = "menu"; } });
 }
 
 /* จอยเสมือน + ปุ่มพุ่ง บนจอทัช */
 function drawTouchControls() {
   if (!touchMode) return;
-  const humans = players.filter(p => !p.isBot);
-  if (humans.length >= 2) {
+  const humans = players.filter(p => !p.isBot && !p.remote && touchCtl[p.idx]);
+  if (net.mode === "local" && humans.length >= 2) {
     ctx.strokeStyle = "rgba(255,255,255,0.07)";
     ctx.lineWidth = 2;
     ctx.setLineDash([10, 14]);
@@ -1041,7 +1404,8 @@ function drawRoundOver() {
   ctx.font = "26px sans-serif";
   const blink = Math.sin(frame * 0.1) > 0 ? 1 : 0.4;
   ctx.globalAlpha = blink;
-  ctx.fillText(touchMode ? "แตะจอเพื่อเริ่มรอบต่อไป" : "กด SPACE เพื่อเริ่มรอบต่อไป", W / 2, H / 2 + 50);
+  ctx.fillText(net.mode === "guest" ? "รอโฮสต์เริ่มรอบต่อไป..."
+    : touchMode ? "แตะจอเพื่อเริ่มรอบต่อไป" : "กด SPACE เพื่อเริ่มรอบต่อไป", W / 2, H / 2 + 50);
   ctx.globalAlpha = 1;
 }
 
@@ -1067,7 +1431,8 @@ function drawChampion() {
   ctx.fillStyle = "#ffffff";
   ctx.font = "26px sans-serif";
   ctx.globalAlpha = Math.sin(frame * 0.1) > 0 ? 1 : 0.4;
-  ctx.fillText(touchMode ? "แตะจอเพื่อกลับเมนู" : "กด SPACE เพื่อกลับเมนู", W / 2, H / 2 + 110);
+  ctx.fillText(net.mode === "guest" ? "รอโฮสต์พากลับห้อง..."
+    : touchMode ? "แตะจอเพื่อไปต่อ" : "กด SPACE เพื่อไปต่อ", W / 2, H / 2 + 110);
   ctx.globalAlpha = 1;
 }
 
@@ -1079,6 +1444,9 @@ function loop() {
   if (shake > 0.5) ctx.translate(rand(-shake, shake), rand(-shake, shake));
 
   if (state === "menu") drawMenu();
+  else if (state === "lobby") drawLobby();
+  else if (state === "joining") drawJoining();
+  else if (state === "guestLobby") drawGuestLobby();
   else if (state === "countdown") drawCountdown();
   else if (state === "playing") drawArena();
   else if (state === "roundOver") drawRoundOver();
