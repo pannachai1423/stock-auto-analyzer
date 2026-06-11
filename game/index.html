@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ศึกอารีน่า — Battle Arena</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -17,6 +17,16 @@
     transform: translate(-50%, -50%);
     box-shadow: 0 0 80px rgba(80, 120, 255, 0.25);
     border-radius: 8px;
+    touch-action: none;
+  }
+  #rotate {
+    position: fixed; inset: 0; z-index: 10;
+    background: #0a0a14; color: #aabbee;
+    display: none; align-items: center; justify-content: center;
+    text-align: center; font-size: 22px; line-height: 1.8;
+  }
+  @media (orientation: portrait) and (pointer: coarse) {
+    #rotate { display: flex; }
   }
   #ui {
     position: absolute; top: 50%; left: 50%;
@@ -26,6 +36,7 @@
 </style>
 </head>
 <body>
+<div id="rotate">📱<br>หมุนเครื่องเป็นแนวนอน<br>เพื่อเล่นเกม</div>
 <canvas id="game"></canvas>
 <script>
 "use strict";
@@ -107,6 +118,93 @@ window.addEventListener("keydown", e => {
   onKeyPress(e.code);
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; });
+
+/* ---------------- ทัชสกรีน (มือถือ/แท็บเล็ต) ----------------
+   ลากนิ้วในโซนของตัวเอง = จอยเสมือน (เดิน+เล็ง) ยิงอัตโนมัติ
+   ปุ่ม ⚡ มุมล่าง = พุ่ง (dash)                                  */
+let touchMode = window.matchMedia("(pointer: coarse)").matches;
+const touchCtl = {};   // playerIdx -> สถานะจอยของผู้เล่นคนนั้น
+let menuButtons = [];  // ปุ่มบนหน้าเมนู (สร้างใหม่ทุกเฟรมตอนวาด)
+
+function canvasPos(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (clientX - r.left) / r.width * W, y: (clientY - r.top) / r.height * H };
+}
+
+function setupTouchControls() {
+  for (const k in touchCtl) delete touchCtl[k];
+  const humans = players.filter(p => !p.isBot);
+  humans.forEach((p, i) => {
+    const split = humans.length >= 2; // 2 คนแบ่งจอซ้าย-ขวา
+    touchCtl[p.idx] = {
+      zone: split ? (i === 0 ? { x0: 0, x1: W / 2 } : { x0: W / 2, x1: W }) : { x0: 0, x1: W },
+      btnX: split && i === 1 ? W - 110 : 110, btnY: H - 110,
+      active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0, dash: false,
+    };
+  });
+}
+
+function gameTouchDown(id, pos) {
+  for (const idx in touchCtl) {
+    const tc = touchCtl[idx];
+    if (pos.x < tc.zone.x0 || pos.x >= tc.zone.x1) continue;
+    if (Math.hypot(pos.x - tc.btnX, pos.y - tc.btnY) < 72) {
+      tc.dash = true;
+    } else if (!tc.active) {
+      tc.active = true; tc.id = id;
+      tc.ox = pos.x; tc.oy = pos.y; tc.dx = 0; tc.dy = 0;
+    }
+    return;
+  }
+}
+function gameTouchMove(id, pos) {
+  for (const idx in touchCtl) {
+    const tc = touchCtl[idx];
+    if (!tc.active || tc.id !== id) continue;
+    let vx = pos.x - tc.ox, vy = pos.y - tc.oy;
+    const len = Math.hypot(vx, vy);
+    if (len > 70) { // จอยลากตามนิ้วถ้าออกนอกรัศมี
+      tc.ox = pos.x - vx / len * 70;
+      tc.oy = pos.y - vy / len * 70;
+    }
+    if (len > 8) {
+      const m = Math.min(1, len / 55);
+      tc.dx = vx / len * m; tc.dy = vy / len * m;
+    } else { tc.dx = 0; tc.dy = 0; }
+  }
+}
+function gameTouchUp(id) {
+  for (const idx in touchCtl) {
+    const tc = touchCtl[idx];
+    if (tc.id === id) { tc.active = false; tc.dx = 0; tc.dy = 0; }
+  }
+}
+
+function onTap(pos) {
+  if (state === "menu") {
+    for (const b of menuButtons) {
+      if (b.slots && pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h) {
+        startMatch(b.slots);
+        return;
+      }
+    }
+  } else if (state === "roundOver") startRound();
+  else if (state === "champion") state = "menu";
+}
+
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  ac(); // ปลดล็อกเสียง
+  if (e.pointerType === "touch") touchMode = true;
+  const pos = canvasPos(e.clientX, e.clientY);
+  if (state === "playing" || state === "countdown") gameTouchDown(e.pointerId, pos);
+  else onTap(pos);
+});
+window.addEventListener("pointermove", e => {
+  if (state === "playing" || state === "countdown") gameTouchMove(e.pointerId, canvasPos(e.clientX, e.clientY));
+});
+window.addEventListener("pointerup", e => gameTouchUp(e.pointerId));
+window.addEventListener("pointercancel", e => gameTouchUp(e.pointerId));
 
 /* ---------------- ค่าผู้เล่น ---------------- */
 const PLAYER_DEFS = [
@@ -219,10 +317,11 @@ const SPAWNS = [
   [100, 100], [W - 100, H - 100], [W - 100, 100], [100, H - 100],
 ];
 
-function makePlayer(i) {
+function makePlayer(i, isBot) {
   const def = PLAYER_DEFS[i];
   return {
     idx: i, def,
+    isBot: !!isBot, botInput: null,
     x: SPAWNS[i][0], y: SPAWNS[i][1],
     vx: 0, vy: 0,
     aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
@@ -237,11 +336,12 @@ function makePlayer(i) {
   };
 }
 
-function startMatch(n) {
-  numPlayers = n;
-  players = [];
-  for (let i = 0; i < n; i++) players.push(makePlayer(i));
+// slots: อาร์เรย์ของ "h" (คน) หรือ "b" (บอท) เช่น ["h","b"]
+function startMatch(slots) {
+  numPlayers = slots.length;
+  players = slots.map((s, i) => makePlayer(i, s === "b"));
   champion = null;
+  setupTouchControls();
   startRound();
 }
 
@@ -257,6 +357,10 @@ function startRound() {
     while (circleHitsWall(p.x, p.y, CFG.playerRadius + 10)) {
       p.x = rand(80, W - 80); p.y = rand(80, H - 80);
     }
+  }
+  for (const idx in touchCtl) {
+    const tc = touchCtl[idx];
+    tc.active = false; tc.dash = false; tc.dx = 0; tc.dy = 0;
   }
   nextPowerupAt = frame + rand(CFG.powerupEvery[0], CFG.powerupEvery[1]);
   countdownT = 180;
@@ -308,9 +412,10 @@ function addFloatText(x, y, text, color) {
 /* ---------------- อัปเดตหลัก ---------------- */
 function onKeyPress(code) {
   if (state === "menu") {
-    if (code === "Digit2") { startMatch(2); }
-    if (code === "Digit3") { startMatch(3); }
-    if (code === "Digit4") { startMatch(4); }
+    if (code === "Digit1") { startMatch(["h", "b"]); }
+    if (code === "Digit2") { startMatch(["h", "h"]); }
+    if (code === "Digit3") { startMatch(["h", "h", "h"]); }
+    if (code === "Digit4") { startMatch(["h", "h", "h", "h"]); }
   } else if (state === "roundOver") {
     if (code === "Space") startRound();
   } else if (state === "champion") {
@@ -318,28 +423,101 @@ function onKeyPress(code) {
   }
 }
 
-function updatePlayer(p) {
-  if (!p.alive) return;
+/* รวมอินพุตจากคีย์บอร์ด / จอยทัช / บอท เป็นรูปแบบเดียว */
+function getInput(p) {
+  if (p.isBot) return p.botInput || { dx: 0, dy: 0, shoot: false, dash: false };
   const k = p.def.keys;
-
-  // ทิศทางการเดิน
   let dx = 0, dy = 0;
   if (keys[k.up]) dy -= 1;
   if (keys[k.down]) dy += 1;
   if (keys[k.left]) dx -= 1;
   if (keys[k.right]) dx += 1;
-  if (dx || dy) {
-    const len = Math.hypot(dx, dy);
-    dx /= len; dy /= len;
-    p.aimX = dx; p.aimY = dy;
+  let shoot = !!keys[k.shoot];
+  let dash = !!keys[k.dash];
+  const tc = touchCtl[p.idx];
+  if (tc) {
+    if (tc.active) { dx = tc.dx; dy = tc.dy; }
+    if (tc.dash) { dash = true; tc.dash = false; }
+    if (touchMode) shoot = true; // บนจอทัชยิงอัตโนมัติ
   }
+  return { dx, dy, shoot, dash };
+}
+
+/* ---------------- บอท AI ---------------- */
+function hasLOS(ax, ay, bx, by) {
+  const steps = 14;
+  for (let i = 1; i < steps; i++) {
+    if (circleHitsWall(ax + (bx - ax) * i / steps, ay + (by - ay) * i / steps, 4)) return false;
+  }
+  return true;
+}
+
+function updateBotAI(p) {
+  const inp = { dx: 0, dy: 0, shoot: false, dash: false, aimX: p.aimX, aimY: p.aimY };
+  p.botInput = inp;
+  const enemies = players.filter(q => q.alive && q.idx !== p.idx);
+  if (!enemies.length) return;
+  let target = enemies[0];
+  for (const e of enemies) {
+    if (dist2(p.x, p.y, e.x, e.y) < dist2(p.x, p.y, target.x, target.y)) target = e;
+  }
+  const d = Math.hypot(target.x - p.x, target.y - p.y);
+
+  // เป้าหมายการเดิน: วิ่งเก็บไอเทมใกล้ๆ ไม่งั้นรักษาระยะ + วนรอบศัตรู
+  let gx, gy, pu = null;
+  for (const u of powerups) {
+    const du = Math.hypot(u.x - p.x, u.y - p.y);
+    if (du < 380 && (u.def.id !== "heal" || p.hp < 65)) { pu = u; break; }
+  }
+  if (pu) {
+    gx = pu.x - p.x; gy = pu.y - p.y;
+  } else {
+    const ang = Math.atan2(target.y - p.y, target.x - p.x);
+    const toward = d > 300 ? 1 : d < 170 ? -1.2 : 0;
+    const strafe = Math.sin(frame * 0.015 + p.idx * 5) > 0 ? 1 : -1;
+    gx = Math.cos(ang) * toward + Math.cos(ang + Math.PI / 2) * strafe;
+    gy = Math.sin(ang) * toward + Math.sin(ang + Math.PI / 2) * strafe;
+  }
+  const gl = Math.hypot(gx, gy) || 1;
+  inp.dx = gx / gl; inp.dy = gy / gl;
+
+  // เล็งใส่เป้า มีพลาดเล็กน้อยให้คนพอสู้ไหว ยิงเมื่อไม่มีกำแพงบัง
+  const aimAng = Math.atan2(target.y - p.y, target.x - p.x) + (Math.random() - 0.5) * 0.16;
+  inp.aimX = Math.cos(aimAng); inp.aimY = Math.sin(aimAng);
+  if (hasLOS(p.x, p.y, target.x, target.y)) inp.shoot = Math.random() < 0.75;
+
+  // กระสุนใกล้ตัวและพุ่งเข้าหา -> มีโอกาสพุ่งหลบด้านข้าง
+  for (const b of bullets) {
+    if (b.owner === p.idx) continue;
+    if (Math.hypot(b.x - p.x, b.y - p.y) < 160) {
+      const closing = (p.x - b.x) * b.vx + (p.y - b.y) * b.vy > 0;
+      if (closing && p.dashCd === 0 && Math.random() < 0.2) {
+        inp.dash = true;
+        const pa = Math.atan2(b.vy, b.vx) + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+        inp.dx = Math.cos(pa); inp.dy = Math.sin(pa);
+      }
+      break;
+    }
+  }
+}
+
+function updatePlayer(p) {
+  if (!p.alive) return;
+  const inp = getInput(p);
+
+  // ทิศทางการเดิน (อนาล็อกจากจอยทัช หรือ -1/0/1 จากคีย์บอร์ด)
+  let dx = inp.dx, dy = inp.dy;
+  let len = Math.hypot(dx, dy);
+  if (len > 1) { dx /= len; dy /= len; len = 1; }
+  if (len > 0.01) { p.aimX = dx / len; p.aimY = dy / len; }
+  if (p.isBot && inp.aimX !== undefined) { p.aimX = inp.aimX; p.aimY = inp.aimY; }
 
   // พุ่ง (dash)
   if (p.dashCd > 0) p.dashCd--;
-  if (keys[k.dash] && p.dashCd === 0 && p.dashLeft === 0 && (dx || dy || p.aimX || p.aimY)) {
+  if (inp.dash && p.dashCd === 0 && p.dashLeft === 0) {
     p.dashLeft = CFG.dashFrames;
-    p.dashDx = (dx || dy) ? dx : p.aimX;
-    p.dashDy = (dx || dy) ? dy : p.aimY;
+    p.dashDx = len > 0.01 ? dx / len : p.aimX;
+    p.dashDy = len > 0.01 ? dy / len : p.aimY;
     p.dashCd = CFG.dashCooldown;
     SFX.dash();
   }
@@ -353,7 +531,7 @@ function updatePlayer(p) {
     p.trail.push({ x: p.x, y: p.y, life: 14 });
   } else {
     mx = dx * speed; my = dy * speed;
-    if (p.buffs.speed > 0 && (dx || dy) && frame % 3 === 0) p.trail.push({ x: p.x, y: p.y, life: 10 });
+    if (p.buffs.speed > 0 && len > 0.1 && frame % 3 === 0) p.trail.push({ x: p.x, y: p.y, life: 10 });
   }
 
   // เคลื่อนที่แยกแกน เพื่อให้ไถลตามกำแพงได้
@@ -365,7 +543,7 @@ function updatePlayer(p) {
 
   // ยิง
   if (p.shootCd > 0) p.shootCd--;
-  if (keys[k.shoot] && p.shootCd <= 0) shoot(p);
+  if (inp.shoot && p.shootCd <= 0) shoot(p);
 
   // บัฟหมดเวลา
   for (const id in p.buffs) {
@@ -504,7 +682,10 @@ function update() {
     return;
   }
 
-  for (const p of players) updatePlayer(p);
+  for (const p of players) {
+    if (p.isBot && p.alive) updateBotAI(p);
+    updatePlayer(p);
+  }
   updateBullets();
   updatePowerups();
 
@@ -587,7 +768,7 @@ function drawPlayer(p) {
   ctx.fillStyle = p.def.color;
   ctx.font = "bold 13px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(p.def.name, p.x, p.y - r - 24);
+  ctx.fillText(p.def.name + (p.isBot ? " 🤖" : ""), p.x, p.y - r - 24);
 
   // วงแหวน cooldown dash
   if (p.dashCd > 0) {
@@ -711,40 +892,100 @@ function drawMenu() {
   ctx.fillText("BATTLE ARENA — เกมยิงมันส์ๆ เล่นกับเพื่อนบนคีย์บอร์ดเดียว", 0, 45);
   ctx.restore();
 
+  // ปุ่มเลือกโหมด (แตะ/คลิก หรือกดเลข 1-4)
+  menuButtons = [];
+  const modes = [
+    { label: "🤖  1 คน — ปะทะบอท", slots: ["h", "b"], color: "#88ffaa" },
+    { label: "👥  2 คน — จอเดียวกัน", slots: ["h", "h"], color: "#55aaff" },
+    { label: "⚔  2 คน + บอท 2 ตัว", slots: ["h", "h", "b", "b"], color: "#ffcc44" },
+  ];
   ctx.textAlign = "center";
-  ctx.font = "bold 30px sans-serif";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("กดเลขเพื่อเลือกจำนวนผู้เล่น", W / 2, 265);
-  ctx.font = "bold 26px sans-serif";
-  ctx.fillStyle = "#88ffaa";
-  ctx.fillText("[2]  สองคน      [3]  สามคน      [4]  สี่คน", W / 2, 310);
-
-  // ตารางปุ่ม
-  const y0 = 380;
-  for (let i = 0; i < 4; i++) {
-    const def = PLAYER_DEFS[i];
-    const x = W / 2 - 480 + i * 240 + 120;
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    roundRect(x - 110, y0 - 30, 220, 130, 12);
-    ctx.fill();
-    ctx.strokeStyle = def.color;
-    ctx.lineWidth = 2;
-    roundRect(x - 110, y0 - 30, 220, 130, 12);
-    ctx.stroke();
-    ctx.fillStyle = def.color;
-    ctx.font = "bold 22px sans-serif";
-    ctx.fillText(def.name, x, y0);
-    ctx.fillStyle = "#ccccdd";
-    ctx.font = "14px sans-serif";
-    const lines = def.help.split(" | ");
-    lines.forEach((ln, li) => ctx.fillText(ln, x, y0 + 28 + li * 22));
+  const bw = 460, bh = 56, gap = 14;
+  let by = 250;
+  for (const m of modes) {
+    const bx = W / 2 - bw / 2;
+    menuButtons.push({ x: bx, y: by, w: bw, h: bh, slots: m.slots });
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    roundRect(bx, by, bw, bh, 14); ctx.fill();
+    ctx.strokeStyle = m.color; ctx.lineWidth = 2;
+    roundRect(bx, by, bw, bh, 14); ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 24px sans-serif";
+    ctx.fillText(m.label, W / 2, by + 37);
+    by += bh + gap;
   }
 
-  ctx.fillStyle = "#667";
-  ctx.font = "17px sans-serif";
-  ctx.fillText("ยิงโดนกัน -18 HP | กระสุนสะท้อนกำแพงได้ 1 ครั้ง | เก็บไอเทมเพื่อความเทพ | ชนะ 5 รอบ = แชมป์", W / 2, 580);
+  if (touchMode) {
+    ctx.fillStyle = "#99aadd";
+    ctx.font = "19px sans-serif";
+    ctx.fillText("📱 ลากนิ้วฝั่งของตัวเอง = เดิน+เล็ง (ยิงอัตโนมัติ)  •  ปุ่ม ⚡ มุมล่าง = พุ่งหลบ", W / 2, by + 35);
+    ctx.fillStyle = "#667";
+    ctx.font = "17px sans-serif";
+    ctx.fillText("ชนะ 5 รอบ = แชมป์ 👑  •  กระสุนสะท้อนกำแพงได้ 1 ครั้ง", W / 2, by + 68);
+  } else {
+    ctx.fillStyle = "#99aadd";
+    ctx.font = "18px sans-serif";
+    ctx.fillText("คีย์บอร์ด: กดเลข [1] [2] [3] [4] เลือกโหมดได้ (3-4 = สามและสี่คน)", W / 2, by + 32);
+    // การ์ดปุ่มของแต่ละคน
+    const y0 = by + 85;
+    for (let i = 0; i < 4; i++) {
+      const def = PLAYER_DEFS[i];
+      const x = W / 2 - 480 + i * 240 + 120;
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      roundRect(x - 110, y0 - 25, 220, 108, 12); ctx.fill();
+      ctx.strokeStyle = def.color; ctx.lineWidth = 2;
+      roundRect(x - 110, y0 - 25, 220, 108, 12); ctx.stroke();
+      ctx.fillStyle = def.color;
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillText(def.name, x, y0);
+      ctx.fillStyle = "#ccccdd";
+      ctx.font = "13px sans-serif";
+      def.help.split(" | ").forEach((ln, li) => ctx.fillText(ln, x, y0 + 24 + li * 20));
+    }
+  }
+
   ctx.fillStyle = "#556";
-  ctx.fillText("ไอเทม:  ⋔ ยิงสามทาง   ● กระสุนยักษ์   ⚡ สปีดสายฟ้า   ◈ โล่   ✚ ฮีล", W / 2, 615);
+  ctx.font = "16px sans-serif";
+  ctx.fillText("ไอเทม:  ⋔ ยิงสามทาง   ● กระสุนยักษ์   ⚡ สปีดสายฟ้า   ◈ โล่   ✚ ฮีล", W / 2, H - 22);
+}
+
+/* จอยเสมือน + ปุ่มพุ่ง บนจอทัช */
+function drawTouchControls() {
+  if (!touchMode) return;
+  const humans = players.filter(p => !p.isBot);
+  if (humans.length >= 2) {
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 14]);
+    ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  for (const p of humans) {
+    const tc = touchCtl[p.idx];
+    if (!tc) continue;
+    ctx.globalAlpha = 0.6;
+    // ปุ่มพุ่ง
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.beginPath(); ctx.arc(tc.btnX, tc.btnY, 48, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = p.dashCd > 0 ? "rgba(255,255,255,0.25)" : p.def.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(tc.btnX, tc.btnY, 48, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - p.dashCd / CFG.dashCooldown));
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "26px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("⚡", tc.btnX, tc.btnY + 1);
+    ctx.textBaseline = "alphabetic";
+    // จอยเสมือน
+    if (tc.active) {
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
+      ctx.beginPath(); ctx.arc(tc.ox, tc.oy, 60, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = p.def.glow + "0.55)";
+      ctx.beginPath(); ctx.arc(tc.ox + tc.dx * 55, tc.oy + tc.dy * 55, 26, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawCountdown() {
@@ -761,6 +1002,11 @@ function drawCountdown() {
   ctx.font = "24px sans-serif";
   ctx.fillStyle = "#99aadd";
   ctx.fillText("เตรียมตัว...", W / 2, H / 2 + 100);
+  if (touchMode) {
+    ctx.font = "19px sans-serif";
+    ctx.fillStyle = "#7788bb";
+    ctx.fillText("ลากนิ้วฝั่งตัวเองเพื่อเดิน (ยิงอัตโนมัติ) • แตะปุ่ม ⚡ เพื่อพุ่งหลบ", W / 2, H / 2 + 145);
+  }
 }
 
 function drawArena() {
@@ -771,6 +1017,7 @@ function drawArena() {
   drawBullets();
   drawParticles();
   drawFloatTexts();
+  drawTouchControls();
   drawScoreboard();
 }
 
@@ -794,7 +1041,7 @@ function drawRoundOver() {
   ctx.font = "26px sans-serif";
   const blink = Math.sin(frame * 0.1) > 0 ? 1 : 0.4;
   ctx.globalAlpha = blink;
-  ctx.fillText("กด SPACE เพื่อเริ่มรอบต่อไป", W / 2, H / 2 + 50);
+  ctx.fillText(touchMode ? "แตะจอเพื่อเริ่มรอบต่อไป" : "กด SPACE เพื่อเริ่มรอบต่อไป", W / 2, H / 2 + 50);
   ctx.globalAlpha = 1;
 }
 
@@ -820,7 +1067,7 @@ function drawChampion() {
   ctx.fillStyle = "#ffffff";
   ctx.font = "26px sans-serif";
   ctx.globalAlpha = Math.sin(frame * 0.1) > 0 ? 1 : 0.4;
-  ctx.fillText("กด SPACE เพื่อกลับเมนู", W / 2, H / 2 + 110);
+  ctx.fillText(touchMode ? "แตะจอเพื่อกลับเมนู" : "กด SPACE เพื่อกลับเมนู", W / 2, H / 2 + 110);
   ctx.globalAlpha = 1;
 }
 
