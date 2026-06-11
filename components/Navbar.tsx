@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/scrapbook", label: "Scrapbook", emoji: "📖" },
   { href: "/timeline", label: "Timeline", emoji: "🌸" },
   { href: "/capsule", label: "Time Capsule", emoji: "⏳" },
+  { href: "/game", label: "Mini Game", emoji: "🎮" },
   { href: "/premium", label: "Premium", emoji: "👑" }
 ];
 
