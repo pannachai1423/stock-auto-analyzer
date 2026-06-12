@@ -9,6 +9,11 @@ const W = 860;
 const H = 380;
 const PAD = { top: 24, right: 18, bottom: 36, left: 64 };
 
+const BRASS = "#debc7c";
+const SAGE = "#9dbfa9";
+const CLAY = "#cf8d7a";
+const MUTED = "#6f6c66";
+
 interface Props {
   plan: PlanResult;
 }
@@ -76,49 +81,43 @@ export default function WealthChart({ plan }: Props) {
       >
         <defs>
           <linearGradient id="rt-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="rt-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="60%" stopColor="#a78bfa" />
-            <stop offset="100%" stopColor="#f472b6" />
+            <stop offset="0%" stopColor={BRASS} stopOpacity="0.16" />
+            <stop offset="100%" stopColor={BRASS} stopOpacity="0" />
           </linearGradient>
         </defs>
 
         {/* gridlines + axis labels */}
         {geom.gridVals.map((v) => (
           <g key={v}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="rgba(148,163,184,0.12)" />
-            <text x={PAD.left - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#64748b">
+            <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="rgba(255,255,255,0.055)" />
+            <text x={PAD.left - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill={MUTED}>
               {formatBahtCompact(v)}
             </text>
           </g>
         ))}
         {geom.ageTicks.map((a) => (
-          <text key={a} x={x(a)} y={H - 12} textAnchor="middle" fontSize="11" fill="#64748b">
+          <text key={a} x={x(a)} y={H - 12} textAnchor="middle" fontSize="11" fill={MUTED}>
             {a}
           </text>
         ))}
-        <text x={W - PAD.right} y={H - 12} textAnchor="end" fontSize="11" fill="#475569">
+        <text x={W - PAD.right} y={H - 12} textAnchor="end" fontSize="11" fill={MUTED}>
           อายุ (ปี)
         </text>
 
         {/* optimistic–pessimistic band */}
-        <path d={geom.band} fill="rgba(167,139,250,0.12)" />
+        <path d={geom.band} fill="rgba(255,255,255,0.045)" />
 
         {/* expected area + line */}
         <path d={geom.area} fill="url(#rt-area)" />
         <motion.path
           d={geom.line((p) => p.expected)}
           fill="none"
-          stroke="url(#rt-line)"
-          strokeWidth="3"
+          stroke={BRASS}
+          strokeWidth="2.25"
           strokeLinecap="round"
           initial={{ pathLength: 0 }}
           animate={{ pathLength: 1 }}
           transition={{ duration: 1.1, ease: "easeOut" }}
-          style={{ filter: "drop-shadow(0 0 8px rgba(34,211,238,0.45))" }}
         />
 
         {/* required-fund target line */}
@@ -129,12 +128,12 @@ export default function WealthChart({ plan }: Props) {
               x2={W - PAD.right}
               y1={y(requiredFund)}
               y2={y(requiredFund)}
-              stroke="#34d399"
-              strokeWidth="1.5"
-              strokeDasharray="6 5"
-              opacity="0.7"
+              stroke={SAGE}
+              strokeWidth="1.25"
+              strokeDasharray="2 5"
+              opacity="0.8"
             />
-            <text x={W - PAD.right} y={y(requiredFund) - 6} textAnchor="end" fontSize="11" fill="#34d399">
+            <text x={W - PAD.right} y={y(requiredFund) - 6} textAnchor="end" fontSize="11" fill={SAGE}>
               เป้าหมาย {formatBahtCompact(requiredFund)}
             </text>
           </g>
@@ -146,21 +145,19 @@ export default function WealthChart({ plan }: Props) {
           x2={x(input.retireAge)}
           y1={PAD.top}
           y2={H - PAD.bottom}
-          stroke="rgba(244,114,182,0.6)"
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth="1"
+          strokeDasharray="3 5"
         />
-        <text x={x(input.retireAge) + 6} y={PAD.top + 12} fontSize="11" fill="#f9a8d4">
+        <text x={x(input.retireAge) + 6} y={PAD.top + 12} fontSize="11" fill="#a8a49c">
           เกษียณ {input.retireAge}
         </text>
 
         {/* depletion marker */}
         {depletionAge !== null && (
           <g>
-            <circle cx={x(depletionAge)} cy={y(0)} r="5" fill="#fb7185">
-              <animate attributeName="r" values="4;7;4" dur="1.6s" repeatCount="indefinite" />
-            </circle>
-            <text x={x(depletionAge)} y={y(0) - 10} textAnchor="middle" fontSize="11" fill="#fb7185">
+            <circle cx={x(depletionAge)} cy={y(0)} r="4" fill={CLAY} />
+            <text x={x(depletionAge)} y={y(0) - 10} textAnchor="middle" fontSize="11" fill={CLAY}>
               เงินหมดอายุ {depletionAge}
             </text>
           </g>
@@ -174,51 +171,51 @@ export default function WealthChart({ plan }: Props) {
               x2={x(hover.age)}
               y1={PAD.top}
               y2={H - PAD.bottom}
-              stroke="rgba(226,232,240,0.35)"
+              stroke="rgba(233,230,223,0.25)"
             />
-            <circle cx={x(hover.age)} cy={y(hover.expected)} r="5" fill="#0f172a" stroke="#22d3ee" strokeWidth="2.5" />
+            <circle cx={x(hover.age)} cy={y(hover.expected)} r="4.5" fill="#0c0c0e" stroke={BRASS} strokeWidth="2" />
           </g>
         )}
       </svg>
 
       {hover && (
         <div
-          className="rt-panel pointer-events-none absolute top-3 z-10 min-w-[180px] px-4 py-3 text-xs"
+          className="pointer-events-none absolute top-3 z-10 min-w-[180px] rounded-xl border border-white/10 bg-[#161613]/95 px-4 py-3 text-xs backdrop-blur"
           style={{
             left: `clamp(0%, ${((x(hover.age) / W) * 100).toFixed(1)}% - 90px, calc(100% - 190px))`
           }}
         >
-          <p className="rt-display mb-1 text-sm font-semibold text-slate-100">
+          <p className="rt-display mb-1.5 text-sm text-stone-100">
             อายุ {hover.age} ปี · พ.ศ. {hover.yearBE}
           </p>
-          <p className="flex justify-between gap-4 text-slate-300">
+          <p className="flex justify-between gap-4 text-stone-400">
             <span>คาดการณ์</span>
-            <span className="font-semibold text-cyan-300">{formatBaht(hover.expected)}</span>
+            <span className="font-medium text-[#e9cd92]">{formatBaht(hover.expected)}</span>
           </p>
-          <p className="flex justify-between gap-4 text-slate-400">
+          <p className="flex justify-between gap-4 text-stone-500">
             <span>กรณีดี / แย่</span>
             <span>
               {formatBahtCompact(hover.optimistic)} / {formatBahtCompact(hover.pessimistic)}
             </span>
           </p>
           {hover.withdrawal > 0 && (
-            <p className="flex justify-between gap-4 text-slate-400">
+            <p className="flex justify-between gap-4 text-stone-500">
               <span>ถอนใช้ปีนั้น</span>
-              <span className="text-pink-300">{formatBahtCompact(hover.withdrawal)}</span>
+              <span>{formatBahtCompact(hover.withdrawal)}</span>
             </p>
           )}
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-slate-400">
-        <span className="flex items-center gap-1.5">
-          <i className="h-[3px] w-5 rounded bg-gradient-to-r from-cyan-400 to-violet-400" /> เส้นทางที่คาดไว้
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px] text-stone-500">
+        <span className="flex items-center gap-2">
+          <i className="h-[2px] w-5 rounded bg-[#debc7c]" /> เส้นทางที่คาดไว้
         </span>
-        <span className="flex items-center gap-1.5">
-          <i className="h-3 w-5 rounded bg-violet-400/20" /> ช่วงผลตอบแทน ±2%
+        <span className="flex items-center gap-2">
+          <i className="h-2.5 w-5 rounded bg-white/10" /> ช่วงผลตอบแทน ±2%
         </span>
-        <span className="flex items-center gap-1.5">
-          <i className="h-[2px] w-5 rounded border-t-2 border-dashed border-emerald-400" /> เงินก้อนเป้าหมาย
+        <span className="flex items-center gap-2">
+          <i className="h-[2px] w-5 rounded border-t border-dashed border-[#9dbfa9]" /> เงินก้อนเป้าหมาย
         </span>
       </div>
     </div>

@@ -10,16 +10,9 @@ interface SliderFieldProps {
   max: number;
   step: number;
   unit: string;
-  accent?: "cyan" | "violet" | "pink";
   format?: (v: number) => string;
   onChange: (v: number) => void;
 }
-
-const ACCENT_TEXT: Record<NonNullable<SliderFieldProps["accent"]>, string> = {
-  cyan: "text-cyan-300",
-  violet: "text-violet-300",
-  pink: "text-pink-300"
-};
 
 /** Slider paired with a directly-editable number, the core control of the planner. */
 export function SliderField({
@@ -30,7 +23,6 @@ export function SliderField({
   max,
   step,
   unit,
-  accent = "cyan",
   format,
   onChange
 }: SliderFieldProps) {
@@ -48,13 +40,13 @@ export function SliderField({
 
   return (
     <label className="block">
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium text-slate-300">{label}</span>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <span className="text-[13px] text-stone-400">{label}</span>
         <span className="flex items-baseline gap-1.5">
           <input
             type="text"
             inputMode="decimal"
-            className={`rt-num w-28 px-2.5 py-1 text-right text-sm font-semibold ${ACCENT_TEXT[accent]}`}
+            className="rt-num w-28 px-2.5 py-1 text-right text-sm font-medium text-[#e9cd92]"
             value={draft ?? (format ? format(value) : String(value))}
             onChange={(e) => setDraft(e.target.value)}
             onFocus={() => setDraft(String(value))}
@@ -62,7 +54,7 @@ export function SliderField({
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             aria-label={label}
           />
-          <span className="text-xs text-slate-500">{unit}</span>
+          <span className="text-[11px] text-stone-500">{unit}</span>
         </span>
       </div>
       <input
@@ -75,12 +67,12 @@ export function SliderField({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      {hint && <p className="mt-1 text-[11px] leading-4 text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1.5 text-[11px] leading-4 text-stone-600">{hint}</p>}
     </label>
   );
 }
 
-/** Eases a number toward its target so stat cards feel alive when inputs move. */
+/** Eases a number toward its target so stat figures feel alive when inputs move. */
 export function useAnimatedNumber(target: number, duration = 600): number {
   const [display, setDisplay] = useState(target);
   const fromRef = useRef(target);
