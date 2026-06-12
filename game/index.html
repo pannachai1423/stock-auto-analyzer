@@ -289,14 +289,17 @@ function startOnlineMatch() {
   net.inputs = {};
   net.conns.forEach((c, i) => {
     c.playerIdx = i + 1;
-    if (c.open) c.send({ t: "start", idx: i + 1, n: players.length, walls });
+    if (c.open) c.send({ t: "start", idx: i + 1, n: players.length, walls, th: mapTheme });
   });
 }
 
 function onHostData(conn, d) {
-  if (d && d.t === "i" && conn.playerIdx !== undefined) {
+  if (!d) return;
+  if (d.t === "i" && conn.playerIdx !== undefined) {
     const inp = net.inputs[conn.playerIdx] || (net.inputs[conn.playerIdx] = { dx: 0, dy: 0, shoot: 0, dash: 0 });
     inp.dx = d.dx || 0; inp.dy = d.dy || 0; inp.shoot = d.s; inp.dash = inp.dash || d.d;
+  } else if (d.t === "skin" && conn.playerIdx !== undefined && players[conn.playerIdx]) {
+    players[conn.playerIdx].skin = Math.min(SKINS.length - 1, Math.max(0, d.v | 0));
   }
 }
 
@@ -319,7 +322,10 @@ function onGuestData(d) {
       net.myIdx = d.idx; numPlayers = d.n;
       for (const k in touchCtl) delete touchCtl[k];
       touchCtl[net.myIdx] = { zone: { x0: 0, x1: W }, btnX: 110, btnY: H - 110, active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0, dash: false };
+      try { net.conn.send({ t: "skin", v: skins[0] || 0 }); } catch (e) {}
     }
+    mapTheme = d.th || 0;
+    buildBackground();
     walls = d.walls;
     buildWallsLayer();
     bullets = []; powerups = []; particles = []; floatTexts = []; net.trails = {};
@@ -353,7 +359,7 @@ function hostNetTick() {
     win: roundWinner ? roundWinner.idx : -1,
     champ: champion ? champion.idx : -1,
     ps: players.map(p => [p.idx, Math.round(p.x), Math.round(p.y), +p.aimX.toFixed(2), +p.aimY.toFixed(2),
-      Math.max(0, Math.round(p.hp)), p.alive ? 1 : 0, p.wins, p.dashLeft > 0 ? 1 : 0, p.dashCd, Object.keys(p.buffs).join(","), p.hitFlash]),
+      Math.max(0, Math.round(p.hp)), p.alive ? 1 : 0, p.wins, p.dashLeft > 0 ? 1 : 0, p.dashCd, Object.keys(p.buffs).join(","), p.hitFlash, p.skin || 0]),
     bs: bullets.map(b => [Math.round(b.x), Math.round(b.y), b.r, b.owner, +b.vx.toFixed(1), +b.vy.toFixed(1)]),
     us: powerups.map(u => [Math.round(u.x), Math.round(u.y), u.def.id]),
     fx: net.fxQueue.splice(0),
@@ -382,7 +388,7 @@ function applySnapToWorld() {
     const trail = net.trails[idx] || (net.trails[idx] = []);
     if (q[8]) trail.push({ x, y, life: 14 });
     return { idx, def: PLAYER_DEFS[idx], x, y, aimX: q[3], aimY: q[4], hp: q[5], alive: !!q[6],
-      wins: q[7], dashLeft: q[8], dashCd: q[9], buffs, hitFlash: q[11], muzzleT: 0, isBot: false, remote: idx !== net.myIdx, trail };
+      wins: q[7], dashLeft: q[8], dashCd: q[9], buffs, hitFlash: q[11], skin: q[12] || 0, muzzleT: 0, isBot: false, remote: idx !== net.myIdx, trail };
   });
   const elapsed = (now - net.snapTime) / 16.7;
   bullets = s.bs.map(b => ({ x: b[0] + b[4] * elapsed, y: b[1] + b[5] * elapsed, r: b[2], owner: b[3], color: PLAYER_DEFS[b[3]].color, vx: b[4], vy: b[5] }));
@@ -477,6 +483,87 @@ function rgba(hex, a) {
   return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
 }
 
+/* ---------------- ธีมแผนที่ (สุ่มใหม่ทุกรอบ) ---------------- */
+const THEMES = [
+  { name: "อวกาศ", sky: "#07070f",
+    blobs: ["rgba(60,40,140,0.22)", "rgba(20,80,170,0.18)", "rgba(150,40,120,0.12)", "rgba(30,130,150,0.10)"],
+    grid: "rgba(120,140,255,0.05)", center: "rgba(120,150,255,0.06)", mote: "#9fb4ff",
+    wall: ["#3c3c62", "#272742", "#1a1a2f"], wallHi: "rgba(175,195,255,0.35)",
+    wallEdge: "rgba(135,155,255,0.6)", wallGlow: "rgba(110,140,255,0.9)" },
+  { name: "ลาวา", sky: "#0f0707",
+    blobs: ["rgba(180,60,20,0.22)", "rgba(140,30,60,0.18)", "rgba(255,120,0,0.10)", "rgba(120,20,20,0.14)"],
+    grid: "rgba(255,140,80,0.05)", center: "rgba(255,130,60,0.05)", mote: "#ffb27a",
+    wall: ["#5e3530", "#3a2120", "#241312"], wallHi: "rgba(255,190,150,0.35)",
+    wallEdge: "rgba(255,130,90,0.6)", wallGlow: "rgba(255,90,40,0.9)" },
+  { name: "ป่านีออน", sky: "#06100a",
+    blobs: ["rgba(20,140,80,0.20)", "rgba(20,120,120,0.16)", "rgba(90,160,30,0.10)", "rgba(10,90,60,0.14)"],
+    grid: "rgba(90,255,160,0.05)", center: "rgba(100,255,170,0.05)", mote: "#8affc0",
+    wall: ["#2f5a40", "#1e3a2a", "#12241a"], wallHi: "rgba(170,255,200,0.35)",
+    wallEdge: "rgba(110,255,170,0.55)", wallGlow: "rgba(60,255,140,0.85)" },
+  { name: "ไซเบอร์", sky: "#0c0612",
+    blobs: ["rgba(140,30,160,0.22)", "rgba(60,30,180,0.18)", "rgba(220,40,120,0.10)", "rgba(90,20,140,0.14)"],
+    grid: "rgba(255,80,220,0.06)", center: "rgba(220,100,255,0.06)", mote: "#ff9af0",
+    wall: ["#4c2a5e", "#32203f", "#1e1328"], wallHi: "rgba(255,180,255,0.35)",
+    wallEdge: "rgba(255,130,240,0.55)", wallGlow: "rgba(230,80,255,0.9)" },
+];
+let mapTheme = 0;
+
+/* ---------------- สกินตัวละคร (จำค่าไว้ในเครื่อง) ---------------- */
+const SKINS = [
+  { name: "ออร์บ" },
+  { name: "ดาว" },
+  { name: "เฮกซ์" },
+  { name: "เจ็ท" },
+  { name: "เพชร" },
+];
+let skins = [0, 0, 0, 0];
+try { skins = (JSON.parse(localStorage.getItem("arena-skins")) || skins).slice(0, 4).map(s => (s | 0) % SKINS.length); } catch (e) {}
+function saveSkins() { try { localStorage.setItem("arena-skins", JSON.stringify(skins)); } catch (e) {} }
+
+// วาดทรงลำตัวตามสกิน (พิกัดศูนย์กลาง 0,0 — หมุนด้วย transform ก่อนเรียก)
+function bodyPath(g, skin, r) {
+  g.beginPath();
+  if (skin === 1) {        // ดาว 5 แฉก
+    for (let i = 0; i < 10; i++) {
+      const a = i * Math.PI / 5 - Math.PI / 2;
+      const rr = i % 2 === 0 ? r * 1.2 : r * 0.58;
+      if (i === 0) g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      else g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    g.closePath();
+  } else if (skin === 2) { // หกเหลี่ยม
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      if (i === 0) g.moveTo(Math.cos(a) * r * 1.08, Math.sin(a) * r * 1.08);
+      else g.lineTo(Math.cos(a) * r * 1.08, Math.sin(a) * r * 1.08);
+    }
+    g.closePath();
+  } else if (skin === 3) { // เจ็ทหัวลูกศร (หันตามทิศเล็ง)
+    g.moveTo(r * 1.35, 0);
+    g.lineTo(-r * 0.95, r * 0.9);
+    g.lineTo(-r * 0.45, 0);
+    g.lineTo(-r * 0.95, -r * 0.9);
+    g.closePath();
+  } else if (skin === 4) { // เพชร
+    g.moveTo(0, -r * 1.25); g.lineTo(r * 0.9, 0); g.lineTo(0, r * 1.25); g.lineTo(-r * 0.9, 0);
+    g.closePath();
+  } else {                 // ออร์บ (วงกลมคลาสสิก)
+    g.arc(0, 0, r, 0, Math.PI * 2);
+  }
+}
+
+/* ---------------- สถิติถาวร (leaderboard ในเครื่อง) ---------------- */
+let stats = {};
+try { stats = JSON.parse(localStorage.getItem("arena-stats")) || {}; } catch (e) {}
+function bumpStat(group, key, n) {
+  stats[group] = stats[group] || {};
+  stats[group][key] = (stats[group][key] || 0) + (n || 1);
+  try { localStorage.setItem("arena-stats", JSON.stringify(stats)); } catch (e) {}
+}
+function statName(p) {
+  return p.isBot ? "บอท 🤖" : p.remote ? p.def.name + " (เพื่อน)" : p.def.name;
+}
+
 /* ---------------- เลเยอร์ภาพ (พรีเรนเดอร์ของหนักๆ ให้มือถือลื่น) ---------------- */
 function makeLayer(w, h) {
   const c = document.createElement("canvas");
@@ -488,15 +575,16 @@ const vignetteLayer = makeLayer(W, H);
 const wallsLayer = makeLayer(W, H);
 
 function buildBackground() {
+  const T = THEMES[mapTheme];
   const g = bgLayer.getContext("2d");
-  g.fillStyle = "#07070f";
+  g.fillStyle = T.sky;
   g.fillRect(0, 0, W, H);
-  // เนบิวลาหลายดวง
+  // เนบิวลาหลายดวง (สีตามธีม)
   const blobs = [
-    [W * 0.20, H * 0.30, 430, "rgba(60,40,140,0.22)"],
-    [W * 0.80, H * 0.72, 470, "rgba(20,80,170,0.18)"],
-    [W * 0.62, H * 0.12, 330, "rgba(150,40,120,0.12)"],
-    [W * 0.33, H * 0.88, 390, "rgba(30,130,150,0.10)"],
+    [W * 0.20, H * 0.30, 430, T.blobs[0]],
+    [W * 0.80, H * 0.72, 470, T.blobs[1]],
+    [W * 0.62, H * 0.12, 330, T.blobs[2]],
+    [W * 0.33, H * 0.88, 390, T.blobs[3]],
   ];
   for (const [x, y, r, col] of blobs) {
     const rg = g.createRadialGradient(x, y, 0, x, y, r);
@@ -514,13 +602,13 @@ function buildBackground() {
   }
   g.globalAlpha = 1;
   // กริดจางๆ
-  g.strokeStyle = "rgba(120,140,255,0.05)";
+  g.strokeStyle = T.grid;
   g.lineWidth = 1;
   for (let x = 0; x <= W; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
   for (let y = 0; y <= H; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
   // แสงนวลกลางสนาม
   const c = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, 720);
-  c.addColorStop(0, "rgba(120,150,255,0.06)");
+  c.addColorStop(0, T.center);
   c.addColorStop(1, "rgba(0,0,0,0)");
   g.fillStyle = c;
   g.fillRect(0, 0, W, H);
@@ -535,6 +623,7 @@ function buildBackground() {
 buildBackground();
 
 function buildWallsLayer() {
+  const T = THEMES[mapTheme];
   const g = wallsLayer.getContext("2d");
   g.clearRect(0, 0, W, H);
   for (const wl of walls) {
@@ -543,19 +632,19 @@ function buildWallsLayer() {
     g.fillRect(wl.x + 6, wl.y + 9, wl.w, wl.h);
     // ตัวบล็อกไล่เฉดให้ดูนูน
     const bd = g.createLinearGradient(wl.x, wl.y, wl.x, wl.y + wl.h);
-    bd.addColorStop(0, "#3c3c62");
-    bd.addColorStop(0.5, "#272742");
-    bd.addColorStop(1, "#1a1a2f");
+    bd.addColorStop(0, T.wall[0]);
+    bd.addColorStop(0.5, T.wall[1]);
+    bd.addColorStop(1, T.wall[2]);
     g.fillStyle = bd;
     g.fillRect(wl.x, wl.y, wl.w, wl.h);
     // ไฮไลต์ขอบบน
-    g.fillStyle = "rgba(175,195,255,0.35)";
+    g.fillStyle = T.wallHi;
     g.fillRect(wl.x, wl.y, wl.w, 3);
     // ขอบนีออนเรืองแสง
     g.save();
-    g.shadowColor = "rgba(110,140,255,0.9)";
+    g.shadowColor = T.wallGlow;
     g.shadowBlur = 16;
-    g.strokeStyle = "rgba(135,155,255,0.6)";
+    g.strokeStyle = T.wallEdge;
     g.lineWidth = 1.5;
     g.strokeRect(wl.x + 0.5, wl.y + 0.5, wl.w - 1, wl.h - 1);
     g.restore();
@@ -568,7 +657,7 @@ for (let i = 0; i < 36; i++) {
   motes.push({ x: Math.random() * W, y: Math.random() * H, r: rand(0.6, 2.2), s: rand(0.1, 0.45), ph: Math.random() * Math.PI * 2 });
 }
 function drawMotes() {
-  ctx.fillStyle = "#9fb4ff";
+  ctx.fillStyle = THEMES[mapTheme].mote;
   for (const m of motes) {
     m.y -= m.s;
     m.x += Math.sin(frame * 0.01 + m.ph) * 0.3;
@@ -647,6 +736,8 @@ function genWalls() {
     },
   ];
   layouts[Math.floor(Math.random() * layouts.length)]();
+  mapTheme = Math.floor(Math.random() * THEMES.length);
+  buildBackground();
   buildWallsLayer();
 }
 
@@ -670,6 +761,7 @@ function makePlayer(i, type) {
   return {
     idx: i, def,
     isBot: type === "b", remote: type === "r", botInput: null,
+    skin: type === "h" ? (skins[i] || 0) : Math.floor(Math.random() * SKINS.length),
     x: SPAWNS[i][0], y: SPAWNS[i][1],
     vx: 0, vy: 0,
     aimX: i % 2 === 0 ? 1 : -1, aimY: 0,
@@ -715,7 +807,7 @@ function startRound() {
   countdownT = 180;
   state = "countdown";
   if (net.mode === "host") {
-    net.conns.forEach(c => { try { if (c.open) c.send({ t: "round", walls }); } catch (e) {} });
+    net.conns.forEach(c => { try { if (c.open) c.send({ t: "round", walls, th: mapTheme }); } catch (e) {} });
   }
   SFX.round();
 }
@@ -771,6 +863,8 @@ function onKeyPress(code) {
     if (code === "Digit2") { startMatch(["h", "h"]); }
     if (code === "Digit3") { startMatch(["h", "h", "h"]); }
     if (code === "Digit4") { startMatch(["h", "h", "h", "h"]); }
+  } else if (state === "stats") {
+    if (code === "Escape" || code === "Space") state = "menu";
   } else if (state === "lobby") {
     if (code === "Space" && net.conns.length >= 1) startOnlineMatch();
     if (code === "Escape") { endOnline(); state = "menu"; }
@@ -1014,7 +1108,10 @@ function killPlayer(p, killerIdx) {
   shake = Math.min(shake + 14, 22);
   SFX.death();
   const killer = players[killerIdx];
-  if (killer) addFloatText(p.x, p.y, killer.def.name + " เก็บ " + p.def.name + "!", killer.def.color);
+  if (killer) {
+    addFloatText(p.x, p.y, killer.def.name + " เก็บ " + p.def.name + "!", killer.def.color);
+    if (killer !== p) bumpStat("kills", statName(killer));
+  }
 
   const alive = players.filter(q => q.alive);
   if (alive.length <= 1) {
@@ -1023,6 +1120,8 @@ function killPlayer(p, killerIdx) {
       roundWinner.wins++;
       if (roundWinner.wins >= CFG.winsToChampion) {
         champion = roundWinner;
+        bumpStat("champs", statName(champion));
+        bumpStat("misc", "matches");
         setTimeout(() => { state = "champion"; SFX.champ(); }, 900);
         return;
       }
@@ -1178,15 +1277,23 @@ function drawPlayer(p) {
     ctx.globalCompositeOperation = "source-over";
   }
 
-  // ลำตัว: สีพื้น + ไล่เฉดทรงกลม (ไฮไลต์บนซ้าย ขอบล่างมืด)
+  // ลำตัวตามสกิน + ไล่เฉดทรงกลม (ไฮไลต์บนซ้าย ขอบล่างมืด)
+  const sk = p.skin || 0;
+  const skinRot = sk === 3 ? ga : (sk === 1 || sk === 4 ? frame * 0.012 + p.idx : 0);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(skinRot);
+  bodyPath(ctx, sk, r);
   ctx.fillStyle = p.hitFlash > 0 ? "#ffffff" : p.def.color;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
-  const hl = ctx.createRadialGradient(p.x - r * 0.45, p.y - r * 0.5, 1, p.x - r * 0.45, p.y - r * 0.5, r * 1.5);
+  ctx.fill();
+  ctx.clip();
+  const hl = ctx.createRadialGradient(-r * 0.45, -r * 0.5, 1, -r * 0.45, -r * 0.5, r * 1.5);
   hl.addColorStop(0, "rgba(255,255,255,0.55)");
   hl.addColorStop(0.4, "rgba(255,255,255,0.08)");
   hl.addColorStop(1, "rgba(0,0,10,0.4)");
   ctx.fillStyle = hl;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(-r * 1.5, -r * 1.5, r * 3, r * 3);
+  ctx.restore();
   // แกนพลังงานกลางตัว
   ctx.globalCompositeOperation = "lighter";
   const core = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 0.5);
@@ -1415,12 +1522,13 @@ function drawMenu() {
     { label: "⚔  2 คน + บอท 2 ตัว", color: "#ffcc44", action: () => startMatch(["h", "h", "b", "b"]) },
     { label: "🌐  สร้างห้องออนไลน์", color: "#ff88ff", action: hostRoom },
     { label: "🌐  เข้าห้องเพื่อน (ใส่รหัส)", color: "#88ffff", action: joinRoom },
+    { label: "🏆  สถิติผู้เล่น", color: "#ffd700", action: () => { state = "stats"; } },
   ];
   ctx.textAlign = "center";
   const bw = 310, bh = 56;
   modes.forEach((m, i) => {
     const col = i % 2, row = Math.floor(i / 2);
-    const bx = i === 4 ? W / 2 - bw / 2 : W / 2 - bw - 10 + col * (bw + 20);
+    const bx = W / 2 - bw - 10 + col * (bw + 20);
     const y = 240 + row * 70;
     menuButtons.push({ x: bx, y, w: bw, h: bh, action: m.action });
     ctx.fillStyle = "rgba(255,255,255,0.06)";
@@ -1434,38 +1542,134 @@ function drawMenu() {
   let by = 240 + 2 * 70 + bh; // ขอบล่างของปุ่มแถวสุดท้าย
 
   if (touchMode) {
+    // ปุ่มเปลี่ยนสกินของ P1 / P2 (บนจอทัช)
+    for (let i = 0; i < 2; i++) {
+      const sx = W / 2 - bw - 10 + i * (bw + 20);
+      const sy = by + 22;
+      menuButtons.push({ x: sx, y: sy, w: bw, h: 46, action: ((j) => () => { skins[j] = (skins[j] + 1) % SKINS.length; saveSkins(); })(i) });
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      roundRect(sx, sy, bw, 46, 12); ctx.fill();
+      ctx.strokeStyle = PLAYER_DEFS[i].color; ctx.lineWidth = 1.5;
+      roundRect(sx, sy, bw, 46, 12); ctx.stroke();
+      // พรีวิวทรงสกิน
+      ctx.save();
+      ctx.translate(sx + 36, sy + 23);
+      bodyPath(ctx, skins[i], 11);
+      ctx.fillStyle = PLAYER_DEFS[i].color;
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 17px sans-serif";
+      ctx.fillText("🎨 สกิน " + PLAYER_DEFS[i].name + ": " + SKINS[skins[i]].name + "  (แตะเปลี่ยน)", sx + bw / 2 + 14, sy + 29);
+    }
     ctx.fillStyle = "#99aadd";
-    ctx.font = "19px sans-serif";
-    ctx.fillText("📱 ลากนิ้วฝั่งของตัวเอง = เดิน+เล็ง (ยิงอัตโนมัติ)  •  ปุ่ม ⚡ มุมล่าง = พุ่งหลบ", W / 2, by + 42);
+    ctx.font = "18px sans-serif";
+    ctx.fillText("📱 ลากนิ้วฝั่งของตัวเอง = เดิน+เล็ง (ยิงอัตโนมัติ)  •  ปุ่ม ⚡ มุมล่าง = พุ่งหลบ", W / 2, by + 100);
     ctx.fillStyle = "#667";
-    ctx.font = "17px sans-serif";
-    ctx.fillText("ออนไลน์: คนนึงสร้างห้องแล้วบอกรหัส 5 ตัวให้เพื่อนเข้าร่วม (สูงสุด 4 คน)", W / 2, by + 75);
-    ctx.fillText("ชนะ 5 รอบ = แชมป์ 👑  •  กระสุนสะท้อนกำแพงได้ 1 ครั้ง", W / 2, by + 105);
+    ctx.font = "16px sans-serif";
+    ctx.fillText("ออนไลน์: สร้างห้องแล้วบอกรหัสให้เพื่อน (สูงสุด 4 คน)  •  ชนะ 5 รอบ = แชมป์ 👑", W / 2, by + 130);
   } else {
     ctx.fillStyle = "#99aadd";
     ctx.font = "17px sans-serif";
-    ctx.fillText("คีย์บอร์ด: กดเลข [1] [2] [3] [4] เลือกโหมดในเครื่อง  •  ออนไลน์: สร้างห้องแล้วบอกรหัสให้เพื่อน", W / 2, by + 38);
-    // การ์ดปุ่มของแต่ละคน
+    ctx.fillText("คีย์บอร์ด: กดเลข [1] [2] [3] [4] เลือกโหมดในเครื่อง  •  คลิกการ์ดผู้เล่นเพื่อเปลี่ยนสกิน", W / 2, by + 38);
+    // การ์ดปุ่มของแต่ละคน (คลิกเพื่อเปลี่ยนสกิน)
     const y0 = by + 88;
     for (let i = 0; i < 4; i++) {
       const def = PLAYER_DEFS[i];
       const x = W / 2 - 480 + i * 240 + 120;
+      menuButtons.push({ x: x - 110, y: y0 - 25, w: 220, h: 126, action: ((j) => () => { skins[j] = (skins[j] + 1) % SKINS.length; saveSkins(); })(i) });
       ctx.fillStyle = "rgba(255,255,255,0.05)";
-      roundRect(x - 110, y0 - 25, 220, 104, 12); ctx.fill();
+      roundRect(x - 110, y0 - 25, 220, 126, 12); ctx.fill();
       ctx.strokeStyle = def.color; ctx.lineWidth = 2;
-      roundRect(x - 110, y0 - 25, 220, 104, 12); ctx.stroke();
+      roundRect(x - 110, y0 - 25, 220, 126, 12); ctx.stroke();
       ctx.fillStyle = def.color;
       ctx.font = "bold 19px sans-serif";
-      ctx.fillText(def.name, x, y0);
+      ctx.fillText(def.name, x + 12, y0);
+      // พรีวิวทรงสกินข้างชื่อ
+      ctx.save();
+      ctx.translate(x - 28, y0 - 6);
+      ctx.rotate(frame * 0.02);
+      bodyPath(ctx, skins[i], 10);
+      ctx.fillStyle = def.color;
+      ctx.fill();
+      ctx.restore();
       ctx.fillStyle = "#ccccdd";
       ctx.font = "13px sans-serif";
       def.help.split(" | ").forEach((ln, li) => ctx.fillText(ln, x, y0 + 23 + li * 19));
+      ctx.fillStyle = def.color;
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText("🎨 " + SKINS[skins[i]].name + " (คลิกเปลี่ยน)", x, y0 + 86);
     }
   }
 
   ctx.fillStyle = "#556";
   ctx.font = "16px sans-serif";
   ctx.fillText("ไอเทม:  ⋔ ยิงสามทาง   ● กระสุนยักษ์   ⚡ สปีดสายฟ้า   ◈ โล่   ✚ ฮีล", W / 2, H - 18);
+}
+
+/* ---------------- หน้าจอสถิติ (leaderboard) ---------------- */
+function drawStats() {
+  drawBackground();
+  menuButtons = [];
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffd700";
+  ctx.font = "bold 44px sans-serif";
+  ctx.shadowColor = "#ffd700"; ctx.shadowBlur = 20;
+  ctx.fillText("🏆 สถิติผู้เล่น", W / 2, 100);
+  ctx.shadowBlur = 0;
+
+  const champs = stats.champs || {}, kills = stats.kills || {};
+  const names = [...new Set([...Object.keys(champs), ...Object.keys(kills)])];
+  names.sort((a, b) => (champs[b] || 0) - (champs[a] || 0) || (kills[b] || 0) - (kills[a] || 0));
+
+  const matches = (stats.misc && stats.misc.matches) || 0;
+  ctx.fillStyle = "#8899cc";
+  ctx.font = "19px sans-serif";
+  ctx.fillText("เล่นจบไปแล้ว " + matches + " แมตช์ (นับเฉพาะเครื่องนี้)", W / 2, 145);
+
+  if (!names.length) {
+    ctx.fillStyle = "#ccccdd";
+    ctx.font = "26px sans-serif";
+    ctx.fillText("ยังไม่มีสถิติ — ไปซัดกันก่อนสักแมตช์สิ! ⚔", W / 2, H / 2);
+  } else {
+    // หัวตาราง
+    const cx = W / 2, colName = cx - 180, colChamp = cx + 90, colKill = cx + 250;
+    ctx.font = "bold 19px sans-serif";
+    ctx.fillStyle = "#778";
+    ctx.textAlign = "left"; ctx.fillText("ผู้เล่น", colName, 195);
+    ctx.textAlign = "center";
+    ctx.fillText("แชมป์ 👑", colChamp, 195);
+    ctx.fillText("คิลรวม ⚔", colKill, 195);
+    names.slice(0, 8).forEach((nm, i) => {
+      const ry = 230 + i * 46;
+      ctx.fillStyle = i === 0 ? "rgba(255,215,0,0.10)" : "rgba(255,255,255,0.04)";
+      roundRect(cx - 330, ry - 28, 660, 40, 10); ctx.fill();
+      ctx.fillStyle = i === 0 ? "#ffd700" : i === 1 ? "#cfd6e6" : i === 2 ? "#d09a5e" : "#9aa3b8";
+      ctx.font = "bold 20px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText((i + 1) + ".", cx - 310, ry);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(nm, colName, ry);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#ffd700";
+      ctx.fillText(String(champs[nm] || 0), colChamp, ry);
+      ctx.fillStyle = "#ff8899";
+      ctx.fillText(String(kills[nm] || 0), colKill, ry);
+    });
+    ctx.textAlign = "center";
+  }
+
+  ctx.fillStyle = "#778";
+  ctx.font = "19px sans-serif";
+  ctx.fillText("ล้างสถิติ", W / 2 - 120, H - 50);
+  menuButtons.push({ x: W / 2 - 200, y: H - 76, w: 160, h: 40, action: () => {
+    stats = {};
+    try { localStorage.removeItem("arena-stats"); } catch (e) {}
+  } });
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 21px sans-serif";
+  ctx.fillText("◀ กลับเมนู", W / 2 + 120, H - 50);
+  menuButtons.push({ x: W / 2 + 30, y: H - 76, w: 180, h: 40, action: () => { state = "menu"; } });
 }
 
 /* ---------------- หน้าจอออนไลน์ ---------------- */
@@ -1632,7 +1836,7 @@ function drawCountdown() {
   ctx.globalAlpha = 1;
   ctx.font = "24px sans-serif";
   ctx.fillStyle = "#99aadd";
-  ctx.fillText("เตรียมตัว...", W / 2, H / 2 + 100);
+  ctx.fillText("เตรียมตัว...  🗺 แผนที่: " + THEMES[mapTheme].name, W / 2, H / 2 + 100);
   if (touchMode) {
     ctx.font = "19px sans-serif";
     ctx.fillStyle = "#7788bb";
@@ -1738,6 +1942,7 @@ function loop() {
   if (shake > 0.5) ctx.translate(rand(-shake, shake), rand(-shake, shake));
 
   if (state === "menu") drawMenu();
+  else if (state === "stats") drawStats();
   else if (state === "lobby") drawLobby();
   else if (state === "joining") drawJoining();
   else if (state === "guestLobby") drawGuestLobby();
