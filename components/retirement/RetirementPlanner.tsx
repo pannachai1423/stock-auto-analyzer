@@ -21,11 +21,20 @@ import {
   formatBahtCompact,
   type PlanInput
 } from "@/lib/retirement/engine";
+import {
+  ASSET_CLASSES,
+  DEFAULT_ALLOCATION,
+  MODEL_PORTFOLIOS,
+  summarizePortfolio,
+  type Allocation
+} from "@/lib/retirement/assets";
 import { SliderField, useAnimatedNumber } from "./fields";
 import ReadinessGauge from "./ReadinessGauge";
 import WealthChart from "./WealthChart";
 
-const STORAGE_KEY = "rt-plan-v1";
+const STORAGE_KEY = "rt-plan-v2";
+
+type ReturnMode = "manual" | "portfolio";
 
 const PRESETS: { label: string; plan: PlanInput }[] = [
   {
@@ -100,6 +109,8 @@ function Section({
 
 export default function RetirementPlanner() {
   const [input, setInput] = useState<PlanInput>(DEFAULT_PLAN);
+  const [mode, setMode] = useState<ReturnMode>("manual");
+  const [alloc, setAlloc] = useState<Allocation>(DEFAULT_ALLOCATION);
   const [showTable, setShowTable] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -107,7 +118,12 @@ export default function RetirementPlanner() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setInput({ ...DEFAULT_PLAN, ...JSON.parse(raw) });
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.input) setInput({ ...DEFAULT_PLAN, ...saved.input });
+        if (saved.mode === "portfolio" || saved.mode === "manual") setMode(saved.mode);
+        if (saved.alloc) setAlloc({ ...DEFAULT_ALLOCATION, ...saved.alloc });
+      }
     } catch {
       /* corrupt storage — keep defaults */
     }
@@ -115,14 +131,27 @@ export default function RetirementPlanner() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(input));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ input, mode, alloc }));
     } catch {
       /* private mode — skip persistence */
     }
-  }, [input]);
+  }, [input, mode, alloc]);
 
-  const plan = useMemo(() => buildPlan(input), [input]);
+  const portfolio = useMemo(() => summarizePortfolio(alloc), [alloc]);
+
+  // In portfolio mode the pre-retirement return and the scenario band
+  // come from the chosen asset mix instead of the manual slider.
+  const effectiveInput = useMemo<PlanInput>(
+    () =>
+      mode === "portfolio"
+        ? { ...input, preReturnPct: portfolio.expectedReturnPct, spreadPct: portfolio.spreadPct }
+        : input,
+    [input, mode, portfolio]
+  );
+
+  const plan = useMemo(() => buildPlan(effectiveInput), [effectiveInput]);
   const set = (patch: Partial<PlanInput>) => setInput((p) => ({ ...p, ...patch }));
+  const setAllocFor = (id: string, v: number) => setAlloc((a) => ({ ...a, [id]: v }));
 
   const onTarget = plan.gap >= 0;
   const extraNeeded = Math.max(0, plan.requiredMonthlySaving - plan.input.monthlySaving);
@@ -140,6 +169,16 @@ export default function RetirementPlanner() {
     list.push(
       `ค่าใช้จ่าย ${numTH(c.monthlyExpense)} บาทต่อเดือนในวันนี้ จะกลายเป็นราว ${numTH(plan.monthlyExpenseAtRetire)} บาทต่อเดือน ณ วันเกษียณ เมื่อคิดเงินเฟ้อ ${c.inflationPct}% ต่อปี`
     );
+    if (mode === "portfolio") {
+      const heavy = ASSET_CLASSES.filter((a) => (alloc[a.id] || 0) > 0)
+        .sort((a, b) => (alloc[b.id] || 0) - (alloc[a.id] || 0))
+        .slice(0, 2)
+        .map((a) => a.name)
+        .join("และ");
+      list.push(
+        `พอร์ตของคุณ (เน้น${heavy}) คาดหวังผลตอบแทนราว ${portfolio.expectedReturnPct.toFixed(1)}% ต่อปี ความผันผวนระดับ${portfolio.riskLabel} — กราฟจึงจำลองช่วงดี/แย่ที่ ±${portfolio.spreadPct.toFixed(1)}%`
+      );
+    }
     if (onTarget) {
       list.push(
         `แผนปัจจุบันเกินเป้า ${formatBahtCompact(plan.gap)} และคาดว่าจะมีเงินเหลือ ณ อายุ ${c.endAge} ราว ${formatBahtCompact(plan.endBalance)}`
@@ -160,7 +199,7 @@ export default function RetirementPlanner() {
       );
     }
     return list;
-  }, [plan, onTarget, extraNeeded]);
+  }, [plan, onTarget, extraNeeded, mode, alloc, portfolio]);
 
   const copySummary = async () => {
     const c = plan.input;
@@ -171,7 +210,15 @@ export default function RetirementPlanner() {
       `คาดว่าจะมี: ${formatBaht(plan.projectedFund)} (${Math.round(plan.readinessPct)}% ของเป้า)`,
       onTarget
         ? `เกินเป้า ${formatBaht(plan.gap)}`
-        : `ขาดอีก ${formatBaht(-plan.gap)} — ควรออม ${numTH(plan.requiredMonthlySaving)} บาทต่อเดือน`
+        : `ขาดอีก ${formatBaht(-plan.gap)} — ควรออม ${numTH(plan.requiredMonthlySaving)} บาทต่อเดือน`,
+      ...(mode === "portfolio"
+        ? [
+            `พอร์ตลงทุน (คาดหวัง ~${portfolio.expectedReturnPct.toFixed(1)}%/ปี): ` +
+              ASSET_CLASSES.filter((a) => (alloc[a.id] || 0) > 0)
+                .map((a) => `${a.name} ${alloc[a.id]}%`)
+                .join(", ")
+          ]
+        : [])
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -266,8 +313,83 @@ export default function RetirementPlanner() {
               />
             </Section>
 
-            <Section icon={<TrendingUp size={15} color="#7c937f" />} chipBg="#eef1ea" title="สมมติฐานผลตอบแทน">
-              <SliderField label="ผลตอบแทนก่อนเกษียณ" hint="พอร์ตเติบโต เช่น กองทุนหุ้น 6–8% ต่อปี" value={input.preReturnPct} min={0} max={15} step={0.5} unit="%/ปี" onChange={(v) => set({ preReturnPct: v })} />
+            <Section icon={<TrendingUp size={15} color="#7c937f" />} chipBg="#eef1ea" title="ผลตอบแทนก่อนเกษียณ">
+              {/* mode switch: type a number vs. build a real asset mix */}
+              <div className="flex rounded-full bg-[#f1ede3] p-1">
+                {(
+                  [
+                    ["manual", "กรอกตัวเลขเอง"],
+                    ["portfolio", "จัดพอร์ตลงทุน"]
+                  ] as [ReturnMode, string][]
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={`flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                      mode === m ? "bg-white text-[#3b362e] shadow-sm" : "text-[#8a8378]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {mode === "manual" ? (
+                <SliderField
+                  label="ผลตอบแทนที่คาดหวัง"
+                  hint="พอร์ตเติบโต เช่น กองทุนหุ้น 6–8% ต่อปี"
+                  value={input.preReturnPct}
+                  min={0}
+                  max={15}
+                  step={0.5}
+                  unit="%/ปี"
+                  onChange={(v) => set({ preReturnPct: v })}
+                />
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`mr-0.5 text-[11px] ${FAINT}`}>พอร์ตแนะนำ</span>
+                    {MODEL_PORTFOLIOS.map((m) => (
+                      <button
+                        key={m.label}
+                        onClick={() => setAlloc({ ...m.alloc })}
+                        className={pillBtn}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {ASSET_CLASSES.map((a) => (
+                    <SliderField
+                      key={a.id}
+                      label={a.name}
+                      hint={`${a.examples} · คาดหวัง ~${a.expectedReturnPct}% ต่อปี`}
+                      value={alloc[a.id] || 0}
+                      min={0}
+                      max={100}
+                      step={5}
+                      unit="%"
+                      onChange={(v) => setAllocFor(a.id, v)}
+                    />
+                  ))}
+
+                  <div className="rounded-2xl bg-[#eef1ea] px-4 py-3">
+                    <p className="flex items-baseline justify-between text-xs text-[#6f675c]">
+                      <span>ผลตอบแทนคาดหวังของพอร์ต</span>
+                      <span className="rt-display text-base text-[#557f63]">
+                        ~{portfolio.expectedReturnPct.toFixed(1)}% ต่อปี
+                      </span>
+                    </p>
+                    <p className={`mt-1 text-[11px] leading-4 ${SOFT}`}>
+                      รวม {portfolio.totalPct}%
+                      {portfolio.totalPct !== 100 && " (ระบบเทียบสัดส่วนเป็น 100% ให้อัตโนมัติ)"}
+                      {" · "}ความผันผวนระดับ{portfolio.riskLabel}
+                    </p>
+                  </div>
+                </>
+              )}
+
               <SliderField label="ผลตอบแทนหลังเกษียณ" hint="พอร์ตปลอดภัยขึ้น เช่น ตราสารหนี้ 3–5% ต่อปี" value={input.postReturnPct} min={0} max={12} step={0.5} unit="%/ปี" onChange={(v) => set({ postReturnPct: v })} />
               <SliderField label="อัตราเงินเฟ้อ" value={input.inflationPct} min={0} max={8} step={0.5} unit="%/ปี" onChange={(v) => set({ inflationPct: v })} />
             </Section>

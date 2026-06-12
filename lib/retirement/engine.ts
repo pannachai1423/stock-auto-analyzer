@@ -15,6 +15,8 @@ export interface PlanInput {
   inflationPct: number;
   monthlyExpense: number; // desired retirement spending, today's value /month
   monthlyPension: number; // pension & other income, today's value /month
+  /** ± percentage points for the optimistic/pessimistic paths (default 2) */
+  spreadPct?: number;
 }
 
 export interface YearPoint {
@@ -74,7 +76,8 @@ export function sanitizePlan(raw: PlanInput): PlanInput {
     postReturnPct: clamp(raw.postReturnPct || 0, 0, 20),
     inflationPct: clamp(raw.inflationPct || 0, 0, 15),
     monthlyExpense: clamp(raw.monthlyExpense || 0, 0, 1e9),
-    monthlyPension: clamp(raw.monthlyPension || 0, 0, 1e9)
+    monthlyPension: clamp(raw.monthlyPension || 0, 0, 1e9),
+    spreadPct: raw.spreadPct === undefined ? 2 : clamp(raw.spreadPct, 0.5, 6)
   };
 }
 
@@ -146,18 +149,17 @@ function solveRequiredMonthlySaving(c: PlanInput, required: number): number {
   return hi;
 }
 
-const SCENARIO_SPREAD = 2; // ± percentage points for optimistic / pessimistic paths
-
 export function buildPlan(raw: PlanInput): PlanResult {
   const c = sanitizePlan(raw);
   const yearBEToday = new Date().getFullYear() + 543;
+  const spread = c.spreadPct ?? 2;
 
   const expected = runScenario(c, r(c.preReturnPct), r(c.postReturnPct));
-  const optimistic = runScenario(c, r(c.preReturnPct + SCENARIO_SPREAD), r(c.postReturnPct + SCENARIO_SPREAD));
+  const optimistic = runScenario(c, r(c.preReturnPct + spread), r(c.postReturnPct + spread));
   const pessimistic = runScenario(
     c,
-    r(Math.max(0, c.preReturnPct - SCENARIO_SPREAD)),
-    r(Math.max(0, c.postReturnPct - SCENARIO_SPREAD))
+    r(Math.max(0, c.preReturnPct - spread)),
+    r(Math.max(0, c.postReturnPct - spread))
   );
 
   const inflation = r(c.inflationPct);

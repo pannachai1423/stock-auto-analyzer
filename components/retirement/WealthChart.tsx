@@ -213,7 +213,8 @@ export default function WealthChart({ plan }: Props) {
           <i className="h-[3px] w-5 rounded bg-[#7fa38c]" /> เส้นทางที่คาดไว้
         </span>
         <span className="flex items-center gap-2">
-          <i className="h-2.5 w-5 rounded bg-[#786950]/10" /> ช่วงผลตอบแทน ±2%
+          <i className="h-2.5 w-5 rounded bg-[#786950]/10" /> ช่วงผลตอบแทน ±
+          {(plan.input.spreadPct ?? 2).toFixed(1).replace(/\.0$/, "")}%
         </span>
         <span className="flex items-center gap-2">
           <i className="h-[2px] w-5 rounded border-t-2 border-dashed border-[#8499b1]" /> เงินก้อนเป้าหมาย
