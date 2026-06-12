@@ -321,7 +321,9 @@ function onGuestData(d) {
       touchCtl[net.myIdx] = { zone: { x0: 0, x1: W }, btnX: 110, btnY: H - 110, active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0, dash: false };
     }
     walls = d.walls;
+    buildWallsLayer();
     bullets = []; powerups = []; particles = []; floatTexts = []; net.trails = {};
+    shocks = []; flashT = 0;
     net.lastSnap = null; net.prevSnap = null;
     state = "countdown"; countdownT = 180;
   } else if (d.t === "snap") {
@@ -340,6 +342,8 @@ function applyFx(fx) {
   if (fx[0] === "sfx") { const f = SFX[fx[1]]; if (f) f(); }
   else if (fx[0] === "ex") explode(fx[1], fx[2], fx[3], fx[4], fx[5]);
   else if (fx[0] === "ft") addFloatText(fx[1], fx[2], fx[3], fx[4]);
+  else if (fx[0] === "sh") addShock(fx[1], fx[2], fx[3], fx[4], fx[5]);
+  else if (fx[0] === "fl") flashT = 7;
 }
 
 function hostNetTick() {
@@ -378,10 +382,10 @@ function applySnapToWorld() {
     const trail = net.trails[idx] || (net.trails[idx] = []);
     if (q[8]) trail.push({ x, y, life: 14 });
     return { idx, def: PLAYER_DEFS[idx], x, y, aimX: q[3], aimY: q[4], hp: q[5], alive: !!q[6],
-      wins: q[7], dashLeft: q[8], dashCd: q[9], buffs, hitFlash: q[11], isBot: false, remote: idx !== net.myIdx, trail };
+      wins: q[7], dashLeft: q[8], dashCd: q[9], buffs, hitFlash: q[11], muzzleT: 0, isBot: false, remote: idx !== net.myIdx, trail };
   });
   const elapsed = (now - net.snapTime) / 16.7;
-  bullets = s.bs.map(b => ({ x: b[0] + b[4] * elapsed, y: b[1] + b[5] * elapsed, r: b[2], owner: b[3], color: PLAYER_DEFS[b[3]].color }));
+  bullets = s.bs.map(b => ({ x: b[0] + b[4] * elapsed, y: b[1] + b[5] * elapsed, r: b[2], owner: b[3], color: PLAYER_DEFS[b[3]].color, vx: b[4], vy: b[5] }));
   powerups = s.us.map(u => ({ x: u[0], y: u[1], def: POWERUPS.find(p => p.id === u[2]), born: 0 }));
   roundWinner = s.win >= 0 ? players.find(p => p.idx === s.win) : null;
   champion = s.champ >= 0 ? players.find(p => p.idx === s.champ) : null;
@@ -468,6 +472,141 @@ let floatTexts = [];
 
 function rand(a, b) { return a + Math.random() * (b - a); }
 function dist2(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
+function rgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
+}
+
+/* ---------------- เลเยอร์ภาพ (พรีเรนเดอร์ของหนักๆ ให้มือถือลื่น) ---------------- */
+function makeLayer(w, h) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  return c;
+}
+const bgLayer = makeLayer(W, H);
+const vignetteLayer = makeLayer(W, H);
+const wallsLayer = makeLayer(W, H);
+
+function buildBackground() {
+  const g = bgLayer.getContext("2d");
+  g.fillStyle = "#07070f";
+  g.fillRect(0, 0, W, H);
+  // เนบิวลาหลายดวง
+  const blobs = [
+    [W * 0.20, H * 0.30, 430, "rgba(60,40,140,0.22)"],
+    [W * 0.80, H * 0.72, 470, "rgba(20,80,170,0.18)"],
+    [W * 0.62, H * 0.12, 330, "rgba(150,40,120,0.12)"],
+    [W * 0.33, H * 0.88, 390, "rgba(30,130,150,0.10)"],
+  ];
+  for (const [x, y, r, col] of blobs) {
+    const rg = g.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, col);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = rg;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // ดวงดาว
+  for (let i = 0; i < 230; i++) {
+    const s = Math.random();
+    g.globalAlpha = 0.12 + s * 0.5;
+    g.fillStyle = s > 0.9 ? "#aaccff" : "#ffffff";
+    g.fillRect(Math.random() * W, Math.random() * H, s > 0.85 ? 2 : 1, s > 0.85 ? 2 : 1);
+  }
+  g.globalAlpha = 1;
+  // กริดจางๆ
+  g.strokeStyle = "rgba(120,140,255,0.05)";
+  g.lineWidth = 1;
+  for (let x = 0; x <= W; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+  for (let y = 0; y <= H; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  // แสงนวลกลางสนาม
+  const c = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, 720);
+  c.addColorStop(0, "rgba(120,150,255,0.06)");
+  c.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = c;
+  g.fillRect(0, 0, W, H);
+  // vignette ขอบมืดแบบโรงหนัง
+  const v = vignetteLayer.getContext("2d");
+  const vg = v.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 0.98);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,8,0.55)");
+  v.fillStyle = vg;
+  v.fillRect(0, 0, W, H);
+}
+buildBackground();
+
+function buildWallsLayer() {
+  const g = wallsLayer.getContext("2d");
+  g.clearRect(0, 0, W, H);
+  for (const wl of walls) {
+    // เงาทอดลงพื้น
+    g.fillStyle = "rgba(0,0,0,0.45)";
+    g.fillRect(wl.x + 6, wl.y + 9, wl.w, wl.h);
+    // ตัวบล็อกไล่เฉดให้ดูนูน
+    const bd = g.createLinearGradient(wl.x, wl.y, wl.x, wl.y + wl.h);
+    bd.addColorStop(0, "#3c3c62");
+    bd.addColorStop(0.5, "#272742");
+    bd.addColorStop(1, "#1a1a2f");
+    g.fillStyle = bd;
+    g.fillRect(wl.x, wl.y, wl.w, wl.h);
+    // ไฮไลต์ขอบบน
+    g.fillStyle = "rgba(175,195,255,0.35)";
+    g.fillRect(wl.x, wl.y, wl.w, 3);
+    // ขอบนีออนเรืองแสง
+    g.save();
+    g.shadowColor = "rgba(110,140,255,0.9)";
+    g.shadowBlur = 16;
+    g.strokeStyle = "rgba(135,155,255,0.6)";
+    g.lineWidth = 1.5;
+    g.strokeRect(wl.x + 0.5, wl.y + 0.5, wl.w - 1, wl.h - 1);
+    g.restore();
+  }
+}
+
+// ฝุ่นแสงลอยในอากาศให้สนามดูมีมิติ
+const motes = [];
+for (let i = 0; i < 36; i++) {
+  motes.push({ x: Math.random() * W, y: Math.random() * H, r: rand(0.6, 2.2), s: rand(0.1, 0.45), ph: Math.random() * Math.PI * 2 });
+}
+function drawMotes() {
+  ctx.fillStyle = "#9fb4ff";
+  for (const m of motes) {
+    m.y -= m.s;
+    m.x += Math.sin(frame * 0.01 + m.ph) * 0.3;
+    if (m.y < -5) { m.y = H + 5; m.x = Math.random() * W; }
+    ctx.globalAlpha = 0.10 + 0.10 * Math.sin(frame * 0.05 + m.ph);
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* คลื่นกระแทก + แฟลชจอ + สโลว์โมชัน */
+let shocks = [];
+let flashT = 0;
+let slowmo = 0;
+
+function addShock(x, y, color, maxR, width) {
+  shocks.push({ x, y, color, r: 6, maxR: maxR || 70, w: width || 3, life: 1 });
+  if (net.mode === "host") net.fxQueue.push(["sh", Math.round(x), Math.round(y), color, maxR || 70, width || 3]);
+}
+function triggerFlash() {
+  flashT = 7;
+  if (net.mode === "host") net.fxQueue.push(["fl"]);
+}
+function drawShocks() {
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = shocks.length - 1; i >= 0; i--) {
+    const s = shocks[i];
+    s.r += (s.maxR - s.r) * 0.16;
+    s.life *= 0.90;
+    if (s.life < 0.04) { shocks.splice(i, 1); continue; }
+    ctx.globalAlpha = s.life * 0.9;
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.w * s.life + 0.5;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+}
 
 /* ---------------- ฉาก / กำแพง ---------------- */
 function genWalls() {
@@ -508,6 +647,7 @@ function genWalls() {
     },
   ];
   layouts[Math.floor(Math.random() * layouts.length)]();
+  buildWallsLayer();
 }
 
 function circleHitsWall(x, y, r) {
@@ -536,7 +676,7 @@ function makePlayer(i, type) {
     hp: CFG.playerHP,
     alive: true,
     wins: 0,
-    shootCd: 0,
+    shootCd: 0, muzzleT: 0,
     dashCd: 0, dashLeft: 0, dashDx: 0, dashDy: 0,
     buffs: {},       // id -> เฟรมที่เหลือ
     hitFlash: 0,
@@ -556,6 +696,7 @@ function startMatch(slots) {
 function startRound() {
   genWalls();
   bullets = []; powerups = []; particles = []; floatTexts = [];
+  shocks = []; flashT = 0; slowmo = 0;
   for (const p of players) {
     p.x = SPAWNS[p.idx][0]; p.y = SPAWNS[p.idx][1];
     p.hp = CFG.playerHP; p.alive = true;
@@ -600,6 +741,7 @@ function shoot(p) {
     });
   }
   p.shootCd = triple ? CFG.shootCooldown * 1.3 : CFG.shootCooldown;
+  p.muzzleT = 4;
   big ? SFX.big() : SFX.shoot();
   for (let i = 0; i < 4; i++) spawnParticle(p.x + p.aimX * 20, p.y + p.aimY * 20, p.def.color, 2);
 }
@@ -763,6 +905,7 @@ function updatePlayer(p) {
     p.dashDx = len > 0.01 ? dx / len : p.aimX;
     p.dashDy = len > 0.01 ? dy / len : p.aimY;
     p.dashCd = CFG.dashCooldown;
+    addShock(p.x, p.y, p.def.color, 46, 2);
     SFX.dash();
   }
 
@@ -795,6 +938,7 @@ function updatePlayer(p) {
     if (p.buffs[id] <= 0) delete p.buffs[id];
   }
   if (p.hitFlash > 0) p.hitFlash--;
+  if (p.muzzleT > 0) p.muzzleT--;
   p.trail = p.trail.filter(t => --t.life > 0);
 }
 
@@ -835,11 +979,13 @@ function updateBullets() {
           if (p.buffs.shield > 0) {
             delete p.buffs.shield;
             explode(b.x, b.y, "#aaccff", 14, 4);
+            addShock(b.x, b.y, "#aaccff", 60, 3);
             addFloatText(p.x, p.y - 30, "โล่กันไว้!", "#aaccff");
             SFX.bounce();
           } else {
             p.hp -= b.dmg;
             p.hitFlash = 8;
+            addShock(b.x, b.y, p.def.color, 48, 2);
             shake = Math.min(shake + (b.dmg > 25 ? 10 : 5), 18);
             explode(b.x, b.y, p.def.color, 10, 4);
             addFloatText(p.x, p.y - 30, "-" + b.dmg, "#ffffff");
@@ -861,6 +1007,10 @@ function updateBullets() {
 function killPlayer(p, killerIdx) {
   p.alive = false;
   explode(p.x, p.y, p.def.color, 40, 7);
+  addShock(p.x, p.y, p.def.color, 150, 6);
+  addShock(p.x, p.y, "#ffffff", 90, 3);
+  triggerFlash();
+  slowmo = 26; // สโลว์โมชันสั้นๆ ตอนเก็บคิล
   shake = Math.min(shake + 14, 22);
   SFX.death();
   const killer = players[killerIdx];
@@ -903,6 +1053,7 @@ function updatePowerups() {
           addFloatText(p.x, p.y - 30, pu.def.label + "!", pu.def.color);
         }
         explode(pu.x, pu.y, pu.def.color, 16, 4);
+        addShock(pu.x, pu.y, pu.def.color, 70, 3);
         SFX.pickup();
         powerups.splice(i, 1);
         break;
@@ -930,6 +1081,12 @@ function update() {
   }
   if (net.mode === "host" && state !== "lobby") hostNetTick();
 
+  // สโลว์โมชันตอนเก็บคิล: เกมเดิน 1 ใน 3 ความเร็วชั่วครู่
+  if (slowmo > 0) {
+    slowmo--;
+    if (frame % 3 !== 0) return;
+  }
+
   if (state === "countdown") {
     countdownT--;
     if (countdownT <= 0) state = "playing";
@@ -956,72 +1113,129 @@ function update() {
 
 /* ---------------- วาด ---------------- */
 function drawBackground() {
-  ctx.fillStyle = "#10101e";
-  ctx.fillRect(0, 0, W, H);
-  // กริดจางๆ
-  ctx.strokeStyle = "rgba(120,140,255,0.05)";
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= W; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y <= H; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.drawImage(bgLayer, 0, 0);
+  drawMotes();
 }
 
 function drawWalls() {
-  for (const wl of walls) {
-    ctx.fillStyle = "#2a2a44";
-    ctx.fillRect(wl.x, wl.y, wl.w, wl.h);
-    ctx.strokeStyle = "rgba(140,160,255,0.4)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(wl.x + 1, wl.y + 1, wl.w - 2, wl.h - 2);
-  }
+  ctx.drawImage(wallsLayer, 0, 0);
 }
 
+const hpGhost = {}; // หลอดเลือดเงาขาวไหลตามตอนโดนยิง (แยกเก็บเพราะฝั่งเกสต์สร้าง player ใหม่ทุกเฟรม)
+
 function drawPlayer(p) {
-  // เงาเส้นทาง dash/speed
+  // เงาเส้นทาง dash/speed แบบเรืองแสง
+  ctx.globalCompositeOperation = "lighter";
   for (const t of p.trail) {
-    ctx.globalAlpha = t.life / 20;
+    ctx.globalAlpha = (t.life / 20) * 0.7;
     ctx.fillStyle = p.def.color;
-    ctx.beginPath(); ctx.arc(t.x, t.y, CFG.playerRadius * 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x, t.y, CFG.playerRadius * 0.8 * (t.life / 14), 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
   if (!p.alive) return;
 
   const r = CFG.playerRadius;
-  // วงเรืองแสง
-  const grad = ctx.createRadialGradient(p.x, p.y, r * 0.4, p.x, p.y, r * 2.2);
-  grad.addColorStop(0, p.def.glow + "0.5)");
+
+  // แสงฟุ้งรอบตัว (additive ให้สีสด)
+  ctx.globalCompositeOperation = "lighter";
+  const grad = ctx.createRadialGradient(p.x, p.y, r * 0.3, p.x, p.y, r * 2.6);
+  grad.addColorStop(0, p.def.glow + "0.4)");
   grad.addColorStop(1, p.def.glow + "0)");
   ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.6, 0, Math.PI * 2); ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
 
-  // ตัวผู้เล่น
-  ctx.fillStyle = p.hitFlash > 0 ? "#ffffff" : p.def.color;
-  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.7)";
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  // เงาใต้ตัว
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + r * 0.9, r * 0.95, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
 
-  // ปากกระบอกชี้ทิศเล็ง
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(p.x + p.aimX * r * 0.5, p.y + p.aimY * r * 0.5);
-  ctx.lineTo(p.x + p.aimX * (r + 10), p.y + p.aimY * (r + 10));
-  ctx.stroke();
+  // ปืนโลหะชี้ทิศเล็ง (วาดก่อนตัวให้โคนจมใต้ลำตัว)
+  const ga = Math.atan2(p.aimY, p.aimX);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(ga);
+  const mg = ctx.createLinearGradient(0, -3.5, 0, 3.5);
+  mg.addColorStop(0, "#e8ecf5");
+  mg.addColorStop(0.5, "#9aa3b5");
+  mg.addColorStop(1, "#4a5060");
+  ctx.fillStyle = mg;
+  ctx.fillRect(r * 0.4, -3.5, r + 11 - r * 0.4, 7);
+  ctx.fillStyle = "#2b2f3a";
+  ctx.fillRect(r + 7, -4.5, 4, 9);
+  ctx.restore();
 
-  // โล่
-  if (p.buffs.shield > 0) {
-    ctx.strokeStyle = "rgba(170,204,255," + (0.5 + 0.3 * Math.sin(frame * 0.2)) + ")";
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2); ctx.stroke();
+  // แฟลชปากกระบอกตอนยิง
+  if (p.muzzleT > 0) {
+    ctx.globalCompositeOperation = "lighter";
+    const mx = p.x + p.aimX * (r + 14), my = p.y + p.aimY * (r + 14);
+    const fg = ctx.createRadialGradient(mx, my, 0, mx, my, 14);
+    fg.addColorStop(0, "rgba(255,255,220,0.9)");
+    fg.addColorStop(0.4, p.def.glow + "0.6)");
+    fg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = fg;
+    ctx.beginPath(); ctx.arc(mx, my, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
   }
 
-  // หลอดเลือด
-  const bw = 52;
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  ctx.fillRect(p.x - bw / 2, p.y - r - 18, bw, 7);
+  // ลำตัว: สีพื้น + ไล่เฉดทรงกลม (ไฮไลต์บนซ้าย ขอบล่างมืด)
+  ctx.fillStyle = p.hitFlash > 0 ? "#ffffff" : p.def.color;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+  const hl = ctx.createRadialGradient(p.x - r * 0.45, p.y - r * 0.5, 1, p.x - r * 0.45, p.y - r * 0.5, r * 1.5);
+  hl.addColorStop(0, "rgba(255,255,255,0.55)");
+  hl.addColorStop(0.4, "rgba(255,255,255,0.08)");
+  hl.addColorStop(1, "rgba(0,0,10,0.4)");
+  ctx.fillStyle = hl;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+  // แกนพลังงานกลางตัว
+  ctx.globalCompositeOperation = "lighter";
+  const core = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 0.5);
+  core.addColorStop(0, "rgba(255,255,255,0.8)");
+  core.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = core;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  // วงแหวนพลังงานหมุนรอบตัว
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(frame * 0.03 + p.idx * 1.7);
+  ctx.strokeStyle = p.def.glow + "0.85)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 11]);
+  ctx.beginPath(); ctx.arc(0, 0, r + 4.5, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // โล่พลังงาน
+  if (p.buffs.shield > 0) {
+    ctx.globalCompositeOperation = "lighter";
+    const sg = ctx.createRadialGradient(p.x, p.y, r, p.x, p.y, r + 12);
+    sg.addColorStop(0, "rgba(170,204,255,0)");
+    sg.addColorStop(0.7, "rgba(170,204,255," + (0.25 + 0.15 * Math.sin(frame * 0.2)) + ")");
+    sg.addColorStop(1, "rgba(170,204,255,0)");
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r + 12, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(190,215,255," + (0.6 + 0.3 * Math.sin(frame * 0.2)) + ")";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // หลอดเลือด: พื้นโค้งมน + เงาขาวดาเมจไหลตาม + เติมไล่เฉด
+  const bw = 52, bx = p.x - bw / 2, byy = p.y - r - 18;
   const hpf = Math.max(0, p.hp / CFG.playerHP);
-  ctx.fillStyle = hpf > 0.5 ? "#66dd77" : hpf > 0.25 ? "#ffcc44" : "#ff5566";
-  ctx.fillRect(p.x - bw / 2 + 1, p.y - r - 17, (bw - 2) * hpf, 5);
+  hpGhost[p.idx] = Math.max(hpf, (hpGhost[p.idx] === undefined ? hpf : hpGhost[p.idx]) - 0.012);
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  roundRect(bx - 1, byy - 1, bw + 2, 9, 4); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  if (hpGhost[p.idx] > 0.001) { roundRect(bx, byy, bw * hpGhost[p.idx], 7, 3); ctx.fill(); }
+  const hpg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+  if (hpf > 0.5) { hpg.addColorStop(0, "#9dffae"); hpg.addColorStop(1, "#3dbb55"); }
+  else if (hpf > 0.25) { hpg.addColorStop(0, "#ffe08a"); hpg.addColorStop(1, "#e8a426"); }
+  else { hpg.addColorStop(0, "#ff8899"); hpg.addColorStop(1, "#dd3344"); }
+  ctx.fillStyle = hpg;
+  if (hpf > 0.001) { roundRect(bx, byy, bw * hpf, 7, 3); ctx.fill(); }
 
   // ชื่อ
   ctx.fillStyle = p.def.color;
@@ -1040,33 +1254,73 @@ function drawPlayer(p) {
 }
 
 function drawBullets() {
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
   for (const b of bullets) {
-    const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 3);
+    const vx = b.vx || 0, vy = b.vy || 0;
+    const sp = Math.hypot(vx, vy) || 1;
+    // หางแสงตามทิศทางวิ่ง
+    const tx = b.x - (vx / sp) * b.r * 6.5, ty = b.y - (vy / sp) * b.r * 6.5;
+    const tg = ctx.createLinearGradient(b.x, b.y, tx, ty);
+    tg.addColorStop(0, b.color);
+    tg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.strokeStyle = tg;
+    ctx.lineWidth = b.r * 1.3;
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(tx, ty); ctx.stroke();
+    // แสงฟุ้งรอบหัวกระสุน
+    const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r * 4);
     grad.addColorStop(0, b.color);
     grad.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 4, 0, Math.PI * 2); ctx.fill();
+    // แกนขาวร้อน
     ctx.fillStyle = "#ffffff";
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.9, 0, Math.PI * 2); ctx.fill();
   }
+  ctx.globalCompositeOperation = "source-over";
 }
 
 function drawPowerups() {
   for (const pu of powerups) {
     const bob = Math.sin((frame - pu.born) * 0.08) * 5;
     const y = pu.y + bob;
-    const grad = ctx.createRadialGradient(pu.x, y, 2, pu.x, y, 30);
-    grad.addColorStop(0, pu.def.color);
+
+    ctx.globalCompositeOperation = "lighter";
+    // ลำแสงตกลงมาจากด้านบน
+    const beam = ctx.createLinearGradient(pu.x, y - 110, pu.x, y);
+    beam.addColorStop(0, rgba(pu.def.color, 0));
+    beam.addColorStop(1, rgba(pu.def.color, 0.20));
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(pu.x - 4, y - 110); ctx.lineTo(pu.x + 4, y - 110);
+    ctx.lineTo(pu.x + 16, y); ctx.lineTo(pu.x - 16, y);
+    ctx.closePath(); ctx.fill();
+    // แสงฟุ้งหายใจ
+    const pulse = 0.4 + 0.18 * Math.sin(frame * 0.09);
+    const grad = ctx.createRadialGradient(pu.x, y, 2, pu.x, y, 34);
+    grad.addColorStop(0, rgba(pu.def.color, pulse));
     grad.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.globalAlpha = 0.5;
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(pu.x, y, 30, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#1a1a2e";
+    ctx.beginPath(); ctx.arc(pu.x, y, 34, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    // ตัวเหรียญ
+    ctx.fillStyle = "#14142a";
     ctx.beginPath(); ctx.arc(pu.x, y, 16, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = pu.def.color;
     ctx.lineWidth = 2.5;
     ctx.stroke();
+    // วงแหวนหมุนรอบนอก
+    ctx.save();
+    ctx.translate(pu.x, y);
+    ctx.rotate(frame * 0.04);
+    ctx.strokeStyle = rgba(pu.def.color, 0.7);
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 9]);
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // ไอคอน
     ctx.fillStyle = pu.def.color;
     ctx.font = "bold 16px sans-serif";
     ctx.textAlign = "center";
@@ -1077,12 +1331,14 @@ function drawPowerups() {
 }
 
 function drawParticles() {
+  ctx.globalCompositeOperation = "lighter";
   for (const pt of particles) {
-    ctx.globalAlpha = pt.life / pt.maxLife;
+    ctx.globalAlpha = (pt.life / pt.maxLife) * 0.9;
     ctx.fillStyle = pt.color;
     ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
 }
 
 function drawFloatTexts() {
@@ -1356,12 +1612,24 @@ function drawCountdown() {
   drawOverlayBox();
   ctx.textAlign = "center";
   const n = Math.ceil(countdownT / 60);
+  const tIn = (countdownT % 60) / 60; // 1 -> 0 ในแต่ละวินาที
+  const sc = 1 + (1 - tIn) * 0.3;
+  // วงแหวนหดเข้าตามจังหวะนับ
+  ctx.strokeStyle = "rgba(120,150,255," + (tIn * 0.5) + ")";
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 90 + tIn * 160, 0, Math.PI * 2); ctx.stroke();
+  ctx.save();
+  ctx.translate(W / 2, H / 2 + 40);
+  ctx.scale(sc, sc);
+  ctx.globalAlpha = 0.35 + tIn * 0.65;
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 140px sans-serif";
   ctx.shadowColor = "#5577ff";
   ctx.shadowBlur = 40;
-  ctx.fillText(n > 0 ? String(n) : "ลุย!", W / 2, H / 2 + 40);
+  ctx.fillText(n > 0 ? String(n) : "ลุย!", 0, 0);
   ctx.shadowBlur = 0;
+  ctx.restore();
+  ctx.globalAlpha = 1;
   ctx.font = "24px sans-serif";
   ctx.fillStyle = "#99aadd";
   ctx.fillText("เตรียมตัว...", W / 2, H / 2 + 100);
@@ -1375,13 +1643,21 @@ function drawCountdown() {
 function drawArena() {
   drawBackground();
   drawWalls();
+  drawShocks();
   drawPowerups();
   for (const p of players) drawPlayer(p);
   drawBullets();
   drawParticles();
   drawFloatTexts();
+  ctx.drawImage(vignetteLayer, 0, 0);
   drawTouchControls();
   drawScoreboard();
+  // แฟลชขาววาบตอนมีคนตาย
+  if (flashT > 0) {
+    ctx.fillStyle = "rgba(255,255,255," + (flashT / 7 * 0.22) + ")";
+    ctx.fillRect(0, 0, W, H);
+    flashT--;
+  }
 }
 
 function drawRoundOver() {
@@ -1411,10 +1687,28 @@ function drawRoundOver() {
 
 function drawChampion() {
   drawBackground();
+  // ลำแสงทองหมุนรอบแชมป์ (god rays)
+  ctx.save();
+  ctx.translate(W / 2, H / 2 - 40);
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 12; i++) {
+    const a = frame * 0.004 + i * Math.PI / 6;
+    const rg = ctx.createLinearGradient(0, 0, Math.cos(a) * 720, Math.sin(a) * 720);
+    rg.addColorStop(0, "rgba(255,215,0,0.10)");
+    rg.addColorStop(1, "rgba(255,215,0,0)");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, 720, a - 0.05, a + 0.05);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.restore();
   // พลุฉลอง
   if (frame % 12 === 0) explode(rand(100, W - 100), rand(80, H / 2), champion.def.color, 25, 6);
   particles.forEach(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.08; });
   drawParticles();
+  ctx.drawImage(vignetteLayer, 0, 0);
 
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffd700";
