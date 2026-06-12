@@ -19,6 +19,8 @@ import {
   buildPlan,
   formatBaht,
   formatBahtCompact,
+  successProbability,
+  toTodayValue,
   type PlanInput
 } from "@/lib/retirement/engine";
 import {
@@ -111,6 +113,8 @@ export default function RetirementPlanner() {
   const [input, setInput] = useState<PlanInput>(DEFAULT_PLAN);
   const [mode, setMode] = useState<ReturnMode>("manual");
   const [alloc, setAlloc] = useState<Allocation>(DEFAULT_ALLOCATION);
+  const [taxRate, setTaxRate] = useState(0);
+  const [realTerms, setRealTerms] = useState(false);
   const [showTable, setShowTable] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -123,6 +127,7 @@ export default function RetirementPlanner() {
         if (saved.input) setInput({ ...DEFAULT_PLAN, ...saved.input });
         if (saved.mode === "portfolio" || saved.mode === "manual") setMode(saved.mode);
         if (saved.alloc) setAlloc({ ...DEFAULT_ALLOCATION, ...saved.alloc });
+        if (typeof saved.taxRate === "number") setTaxRate(saved.taxRate);
       }
     } catch {
       /* corrupt storage — keep defaults */
@@ -131,11 +136,11 @@ export default function RetirementPlanner() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ input, mode, alloc }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ input, mode, alloc, taxRate }));
     } catch {
       /* private mode — skip persistence */
     }
-  }, [input, mode, alloc]);
+  }, [input, mode, alloc, taxRate]);
 
   const portfolio = useMemo(() => summarizePortfolio(alloc), [alloc]);
 
@@ -150,8 +155,15 @@ export default function RetirementPlanner() {
   );
 
   const plan = useMemo(() => buildPlan(effectiveInput), [effectiveInput]);
+  const successPct = useMemo(() => successProbability(effectiveInput), [effectiveInput]);
+  // chart + table can be viewed in nominal baht or today's purchasing power
+  const viewPlan = useMemo(() => (realTerms ? toTodayValue(plan) : plan), [plan, realTerms]);
   const set = (patch: Partial<PlanInput>) => setInput((p) => ({ ...p, ...patch }));
   const setAllocFor = (id: string, v: number) => setAlloc((a) => ({ ...a, [id]: v }));
+
+  // tax relief estimate if the monthly saving goes through RMF/ThaiESG-style funds
+  const RMF_CAP = 500_000;
+  const taxSaved = Math.min(input.monthlySaving * 12, RMF_CAP) * (taxRate / 100);
 
   const onTarget = plan.gap >= 0;
   const extraNeeded = Math.max(0, plan.requiredMonthlySaving - plan.input.monthlySaving);
@@ -211,6 +223,7 @@ export default function RetirementPlanner() {
       onTarget
         ? `เกินเป้า ${formatBaht(plan.gap)}`
         : `ขาดอีก ${formatBaht(-plan.gap)} — ควรออม ${numTH(plan.requiredMonthlySaving)} บาทต่อเดือน`,
+      `โอกาสสำเร็จจากการจำลอง 500 สถานการณ์: ${Math.round(successPct)}%`,
       ...(mode === "portfolio"
         ? [
             `พอร์ตลงทุน (คาดหวัง ~${portfolio.expectedReturnPct.toFixed(1)}%/ปี): ` +
@@ -311,6 +324,24 @@ export default function RetirementPlanner() {
                 unit="%"
                 onChange={(v) => set({ savingGrowthPct: v })}
               />
+              <SliderField
+                label="ฐานภาษีของคุณ"
+                hint="อัตราภาษีขั้นสูงสุดของรายได้คุณ ใช้ประมาณเงินภาษีที่ประหยัดได้"
+                value={taxRate}
+                min={0}
+                max={35}
+                step={5}
+                unit="%"
+                onChange={setTaxRate}
+              />
+              {taxRate > 0 && input.monthlySaving > 0 && (
+                <p className="rounded-2xl bg-[#eef1ea] px-4 py-3 text-[12px] leading-5 text-[#557f63]">
+                  หากเงินออมนี้ลงผ่านกองทุนลดหย่อนภาษี เช่น RMF / ThaiESG
+                  คุณอาจประหยัดภาษีได้ราว{" "}
+                  <span className="rt-display">{numTH(taxSaved)} บาทต่อปี</span>{" "}
+                  (คิดจากเพดานลดหย่อน {numTH(RMF_CAP)} บาท ตามเงื่อนไขของแต่ละกองทุน)
+                </p>
+              )}
             </Section>
 
             <Section icon={<TrendingUp size={15} color="#7c937f" />} chipBg="#eef1ea" title="ผลตอบแทนก่อนเกษียณ">
@@ -410,6 +441,27 @@ export default function RetirementPlanner() {
             {/* overview */}
             <div className="rt-panel p-6 sm:p-7">
               <p className={`rt-display text-xl leading-snug ${INK}`}>{verdictLine}</p>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#f0eadf]">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{
+                      background:
+                        successPct >= 80 ? "#87a892" : successPct >= 60 ? "#cbb279" : "#cf9077"
+                    }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${successPct}%` }}
+                    transition={{ type: "spring", stiffness: 60, damping: 18 }}
+                  />
+                </div>
+                <span className={`shrink-0 text-sm font-semibold ${INK}`}>
+                  โอกาสสำเร็จ {Math.round(successPct)}%
+                </span>
+              </div>
+              <p className={`mt-1 text-[11px] ${FAINT}`}>
+                จากการจำลองตลาดผันผวนขึ้นลงแบบสุ่ม 500 สถานการณ์ (Monte Carlo)
+                ว่าเงินพอใช้ถึงอายุ {plan.input.endAge} กี่ครั้ง
+              </p>
               <div className="mt-6 grid items-center gap-8 sm:grid-cols-[auto,1fr]">
                 <ReadinessGauge readinessPct={plan.readinessPct} />
                 <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
@@ -446,12 +498,37 @@ export default function RetirementPlanner() {
             <div className="rt-panel p-6 sm:p-7">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <h2 className={`rt-display text-lg ${INK}`}>เส้นทางความมั่งคั่งของคุณ</h2>
-                <button onClick={copySummary} className={`${pillBtn} flex items-center gap-1.5`}>
-                  {copied ? <Check size={12} className="text-[#557f63]" /> : <Copy size={12} />}
-                  {copied ? "คัดลอกแล้ว" : "คัดลอกสรุปแผน"}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded-full bg-[#f1ede3] p-1">
+                    {(
+                      [
+                        [false, "มูลค่า ณ ปีนั้น"],
+                        [true, "มูลค่าเงินวันนี้"]
+                      ] as [boolean, string][]
+                    ).map(([v, label]) => (
+                      <button
+                        key={label}
+                        onClick={() => setRealTerms(v)}
+                        className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
+                          realTerms === v ? "bg-white text-[#3b362e] shadow-sm" : "text-[#8a8378]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={copySummary} className={`${pillBtn} flex items-center gap-1.5`}>
+                    {copied ? <Check size={12} className="text-[#557f63]" /> : <Copy size={12} />}
+                    {copied ? "คัดลอกแล้ว" : "คัดลอกสรุปแผน"}
+                  </button>
+                </div>
               </div>
-              <WealthChart plan={plan} />
+              <WealthChart plan={viewPlan} />
+              {realTerms && (
+                <p className={`mt-2 text-[11px] ${FAINT}`}>
+                  ตัวเลขถูกปรับเป็นอำนาจซื้อของเงินวันนี้แล้ว (หักเงินเฟ้อ {plan.input.inflationPct}% ต่อปีออก)
+                </p>
+              )}
             </div>
 
             {/* insights */}
@@ -509,7 +586,7 @@ export default function RetirementPlanner() {
                           </tr>
                         </thead>
                         <tbody>
-                          {plan.timeline.map((p) => (
+                          {viewPlan.timeline.map((p) => (
                             <tr key={p.age} className="border-t border-[#f3eee4]">
                               <td className="py-2 pr-4 text-[#5c554a]">{p.age}</td>
                               <td className={`py-2 pr-4 ${FAINT}`}>{p.yearBE}</td>

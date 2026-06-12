@@ -200,6 +200,84 @@ export function buildPlan(raw: PlanInput): PlanResult {
   };
 }
 
+/** Re-express a plan in today's purchasing power (deflate by inflation). */
+export function toTodayValue(plan: PlanResult): PlanResult {
+  const inflation = r(plan.input.inflationPct);
+  const base = plan.input.currentAge;
+  const f = (age: number) => 1 / Math.pow(1 + inflation, age - base);
+  return {
+    ...plan,
+    requiredFund: plan.requiredFund * f(plan.input.retireAge),
+    timeline: plan.timeline.map((p) => ({
+      ...p,
+      expected: p.expected * f(p.age),
+      optimistic: p.optimistic * f(p.age),
+      pessimistic: p.pessimistic * f(p.age),
+      withdrawal: p.withdrawal * f(p.age)
+    }))
+  };
+}
+
+/* ---------- Monte Carlo success probability ---------- */
+
+// deterministic PRNG so the same inputs always show the same probability
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Share of simulated market paths (random yearly returns around the plan's
+ * assumptions) in which the money lasts until endAge. Volatility is derived
+ * from the same spread that drives the chart band, so a riskier portfolio
+ * widens both consistently.
+ */
+export function successProbability(raw: PlanInput, runs = 500): number {
+  const c = sanitizePlan(raw);
+  const spread = c.spreadPct ?? 2;
+  const volPre = Math.max(0.01, ((spread - 1) * 8 + 1) / 100);
+  const volPost = volPre * 0.6;
+  const meanPre = r(c.preReturnPct);
+  const meanPost = r(c.postReturnPct);
+  const inflation = r(c.inflationPct);
+  const netMonthlyNeed = Math.max(0, c.monthlyExpense - c.monthlyPension);
+
+  const rand = mulberry32(1234567);
+  const normal = () => {
+    const u = Math.max(rand(), 1e-12);
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
+  };
+
+  let success = 0;
+  for (let i = 0; i < runs; i++) {
+    let bal = c.currentSavings;
+    let contrib = c.monthlySaving * 12;
+    let alive = true;
+    for (let age = c.currentAge; age < c.endAge; age++) {
+      if (age < c.retireAge) {
+        const ret = Math.max(-0.9, meanPre + volPre * normal());
+        bal = bal * (1 + ret) + contrib * (1 + ret / 2);
+        contrib *= 1 + r(c.savingGrowthPct);
+      } else {
+        const need = netMonthlyNeed * 12 * Math.pow(1 + inflation, age - c.currentAge);
+        const ret = Math.max(-0.9, meanPost + volPost * normal());
+        bal = (bal - need) * (1 + ret);
+        if (bal < 0) {
+          alive = false;
+          break;
+        }
+      }
+    }
+    if (alive) success++;
+  }
+  return (success / runs) * 100;
+}
+
 /* ---------- formatting helpers (Thai locale) ---------- */
 
 const bahtFull = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 });
