@@ -46,7 +46,7 @@ export function SliderField({
           <input
             type="text"
             inputMode="decimal"
-            className="rt-num w-28 px-2.5 py-1 text-right text-sm font-semibold text-[#e05f3c]"
+            className="rt-num w-28 px-2.5 py-1 text-right text-sm font-semibold text-[#3b362e]"
             value={draft ?? (format ? format(value) : String(value))}
             onChange={(e) => setDraft(e.target.value)}
             onFocus={() => setDraft(String(value))}

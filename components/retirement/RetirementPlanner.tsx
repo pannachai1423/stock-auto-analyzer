@@ -183,7 +183,7 @@ export default function RetirementPlanner() {
   };
 
   const pillBtn =
-    "rounded-full border border-[#e7dfd0] bg-white px-4 py-1.5 text-xs font-medium text-[#6f675c] shadow-sm transition hover:border-[#ef7350] hover:text-[#e05f3c] active:scale-95";
+    "rounded-full border border-[#e7dfd0] bg-white px-4 py-1.5 text-xs font-medium text-[#6f675c] shadow-sm transition hover:border-[#a9c4b1] hover:text-[#557f63] active:scale-95";
 
   return (
     <div className="rt-root fixed inset-0 z-[70] overflow-y-auto">
@@ -198,12 +198,12 @@ export default function RetirementPlanner() {
           <div>
             <Link
               href="/"
-              className={`mb-4 inline-flex items-center gap-1.5 text-xs ${SOFT} transition hover:text-[#e05f3c]`}
+              className={`mb-4 inline-flex items-center gap-1.5 text-xs ${SOFT} transition hover:text-[#557f63]`}
             >
               <ArrowLeft size={13} /> กลับหน้าหลัก
             </Link>
             <h1 className={`rt-display text-[34px] font-medium leading-tight sm:text-[40px] ${INK}`}>
-              วางแผนเกษียณ<span className="text-[#ef7350]">.</span>
+              วางแผนเกษียณ<span className="text-[#87a892]">.</span>
             </h1>
             <p className={`mt-2 max-w-xl text-sm leading-6 ${SOFT}`}>
               เลื่อนตัวปรับด้านซ้าย แล้วดูอนาคตการเงินของคุณเปลี่ยนตามแบบเรียลไทม์ —
@@ -236,7 +236,7 @@ export default function RetirementPlanner() {
             transition={{ duration: 0.45, delay: 0.07 }}
             className="rt-panel h-fit space-y-8 p-6 sm:p-7 lg:sticky lg:top-6"
           >
-            <Section icon={<User size={15} color="#e05f3c" />} chipBg="#fdeae3" title="ข้อมูลของคุณ">
+            <Section icon={<User size={15} color="#7c937f" />} chipBg="#eef1ea" title="ข้อมูลของคุณ">
               <SliderField label="อายุปัจจุบัน" value={input.currentAge} min={18} max={70} step={1} unit="ปี" onChange={(v) => set({ currentAge: v })} />
               <SliderField label="อายุที่จะเกษียณ" value={input.retireAge} min={40} max={75} step={1} unit="ปี" onChange={(v) => set({ retireAge: v })} />
               <SliderField
@@ -251,7 +251,7 @@ export default function RetirementPlanner() {
               />
             </Section>
 
-            <Section icon={<PiggyBank size={15} color="#3e8e5d" />} chipBg="#e7f3eb" title="เงินออมและการลงทุน">
+            <Section icon={<PiggyBank size={15} color="#7c937f" />} chipBg="#eef1ea" title="เงินออมและการลงทุน">
               <SliderField label="เงินเก็บปัจจุบัน" value={input.currentSavings} min={0} max={20_000_000} step={50_000} unit="บาท" format={numTH} onChange={(v) => set({ currentSavings: v })} />
               <SliderField label="ออมต่อเดือน" value={input.monthlySaving} min={0} max={200_000} step={1_000} unit="บาท" format={numTH} onChange={(v) => set({ monthlySaving: v })} />
               <SliderField
@@ -266,13 +266,13 @@ export default function RetirementPlanner() {
               />
             </Section>
 
-            <Section icon={<TrendingUp size={15} color="#b07c1f" />} chipBg="#f9efd9" title="สมมติฐานผลตอบแทน">
+            <Section icon={<TrendingUp size={15} color="#7c937f" />} chipBg="#eef1ea" title="สมมติฐานผลตอบแทน">
               <SliderField label="ผลตอบแทนก่อนเกษียณ" hint="พอร์ตเติบโต เช่น กองทุนหุ้น 6–8% ต่อปี" value={input.preReturnPct} min={0} max={15} step={0.5} unit="%/ปี" onChange={(v) => set({ preReturnPct: v })} />
               <SliderField label="ผลตอบแทนหลังเกษียณ" hint="พอร์ตปลอดภัยขึ้น เช่น ตราสารหนี้ 3–5% ต่อปี" value={input.postReturnPct} min={0} max={12} step={0.5} unit="%/ปี" onChange={(v) => set({ postReturnPct: v })} />
               <SliderField label="อัตราเงินเฟ้อ" value={input.inflationPct} min={0} max={8} step={0.5} unit="%/ปี" onChange={(v) => set({ inflationPct: v })} />
             </Section>
 
-            <Section icon={<Sun size={15} color="#5a7fae" />} chipBg="#e8eff7" title="ชีวิตหลังเกษียณ">
+            <Section icon={<Sun size={15} color="#7c937f" />} chipBg="#eef1ea" title="ชีวิตหลังเกษียณ">
               <SliderField label="ค่าใช้จ่ายที่อยากมี" hint="คิดเป็นมูลค่าเงินวันนี้ ระบบจะปรับเงินเฟ้อให้เอง" value={input.monthlyExpense} min={5_000} max={300_000} step={1_000} unit="บาท/เดือน" format={numTH} onChange={(v) => set({ monthlyExpense: v })} />
               <SliderField label="บำนาญ/รายได้อื่น" hint="เช่น ประกันสังคม กบข. ค่าเช่า — มูลค่าเงินวันนี้" value={input.monthlyPension} min={0} max={100_000} step={500} unit="บาท/เดือน" format={numTH} onChange={(v) => set({ monthlyPension: v })} />
             </Section>
@@ -304,7 +304,7 @@ export default function RetirementPlanner() {
                   <Stat
                     label={onTarget ? "เกินเป้า" : "ยังขาดอีก"}
                     value={Math.abs(plan.gap)}
-                    tone={onTarget ? "text-[#3e8e5d]" : "text-[#c2502f]"}
+                    tone={onTarget ? "text-[#557f63]" : "text-[#b0644c]"}
                   />
                   <Stat
                     label="เงินออมที่ควรออมต่อเดือน"
@@ -314,7 +314,7 @@ export default function RetirementPlanner() {
                         ? `มากกว่าที่ออมตอนนี้ ${numTH(extraNeeded)} บาท`
                         : "ที่ออมอยู่ตอนนี้เพียงพอแล้ว"
                     }
-                    tone={extraNeeded > 0 ? "text-[#b07c1f]" : "text-[#3e8e5d]"}
+                    tone={extraNeeded > 0 ? "text-[#8d7a4d]" : "text-[#557f63]"}
                   />
                 </div>
               </div>
@@ -325,7 +325,7 @@ export default function RetirementPlanner() {
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <h2 className={`rt-display text-lg ${INK}`}>เส้นทางความมั่งคั่งของคุณ</h2>
                 <button onClick={copySummary} className={`${pillBtn} flex items-center gap-1.5`}>
-                  {copied ? <Check size={12} className="text-[#3e8e5d]" /> : <Copy size={12} />}
+                  {copied ? <Check size={12} className="text-[#557f63]" /> : <Copy size={12} />}
                   {copied ? "คัดลอกแล้ว" : "คัดลอกสรุปแผน"}
                 </button>
               </div>
@@ -344,7 +344,7 @@ export default function RetirementPlanner() {
                     transition={{ delay: 0.05 * i }}
                     className="flex items-baseline gap-3.5 border-b border-[#f3eee4] py-3.5 text-sm leading-6 text-[#5c554a] last:border-0 last:pb-1"
                   >
-                    <span className="rt-display flex h-6 w-6 shrink-0 translate-y-1 items-center justify-center rounded-full bg-[#fdeae3] text-[11px] text-[#e05f3c]">
+                    <span className="rt-display flex h-6 w-6 shrink-0 translate-y-1 items-center justify-center rounded-full bg-[#eef1ea] text-[11px] text-[#6f8f7c]">
                       {i + 1}
                     </span>
                     {text}
@@ -395,7 +395,7 @@ export default function RetirementPlanner() {
                                 <span className={`inline-flex items-center gap-2 text-[12px] ${SOFT}`}>
                                   <i
                                     className={`h-1.5 w-1.5 rounded-full ${
-                                      p.phase === "save" ? "bg-[#ef7350]" : "bg-[#3e8e5d]"
+                                      p.phase === "save" ? "bg-[#a9c4b1]" : "bg-[#a9b8c9]"
                                     }`}
                                   />
                                   {p.phase === "save" ? "สะสม" : "เกษียณ"}
@@ -407,7 +407,7 @@ export default function RetirementPlanner() {
                               <td
                                 className={`py-2 text-right font-medium ${
                                   p.expected <= 0 && p.phase === "retire"
-                                    ? "text-[#c2502f]"
+                                    ? "text-[#b0644c]"
                                     : "text-[#3b362e]"
                                 }`}
                               >

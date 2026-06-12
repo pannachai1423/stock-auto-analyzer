@@ -42,7 +42,7 @@ body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
 .rt-display {
   font-family: var(--font-rt-display), "Mitr", sans-serif;
 }
-.rt-root ::selection { background: rgba(239, 115, 80, 0.2); color: #3b362e; }
+.rt-root ::selection { background: rgba(157, 191, 169, 0.35); color: #3b362e; }
 .rt-root::-webkit-scrollbar { width: 10px; }
 .rt-root::-webkit-scrollbar-thumb { background: #e3dccd; border-radius: 999px; }
 .rt-root::-webkit-scrollbar-thumb:hover { background: #d4cab6; }
@@ -62,7 +62,7 @@ body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
   height: 6px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, #ef7350, #f08a59) 0 / var(--rt-fill, 50%) 100% no-repeat,
+    linear-gradient(90deg, #a9c4b1, #a9c4b1) 0 / var(--rt-fill, 50%) 100% no-repeat,
     #f0eadf;
   outline: none;
   cursor: pointer;
@@ -74,7 +74,7 @@ body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
   height: 20px;
   border-radius: 999px;
   background: #ffffff;
-  border: 2.5px solid #ef7350;
+  border: 2.5px solid #87a892;
   box-shadow: 0 2px 6px rgba(80, 65, 40, 0.18);
   transition: transform 0.15s;
 }
@@ -85,11 +85,11 @@ body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
   height: 20px;
   border-radius: 999px;
   background: #ffffff;
-  border: 2.5px solid #ef7350;
+  border: 2.5px solid #87a892;
   box-shadow: 0 2px 6px rgba(80, 65, 40, 0.18);
 }
 .rt-range:focus-visible {
-  box-shadow: 0 0 0 3px rgba(239, 115, 80, 0.25);
+  box-shadow: 0 0 0 3px rgba(135, 168, 146, 0.35);
 }
 
 .rt-num {
@@ -102,7 +102,7 @@ body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
 .rt-num:focus {
   outline: none;
   background: #ffffff;
-  border-color: #ef7350;
+  border-color: #87a892;
 }
 .rt-num::-webkit-outer-spin-button, .rt-num::-webkit-inner-spin-button {
   -webkit-appearance: none;

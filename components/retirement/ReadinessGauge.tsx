@@ -13,10 +13,10 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 const ARC = CIRCUMFERENCE * 0.75; // 270° arc
 
 function verdict(pct: number): { label: string; color: string; bg: string } {
-  if (pct >= 100) return { label: "พร้อมเกษียณแล้ว", color: "#3e8e5d", bg: "#e7f3eb" };
-  if (pct >= 80) return { label: "เกือบถึงเป้าแล้ว", color: "#b07c1f", bg: "#f9efd9" };
-  if (pct >= 50) return { label: "ยังต้องสะสมเพิ่ม", color: "#b07c1f", bg: "#f9efd9" };
-  return { label: "ควรปรับแผน", color: "#c2502f", bg: "#fbe9e2" };
+  if (pct >= 100) return { label: "พร้อมเกษียณแล้ว", color: "#557f63", bg: "#eaf0ea" };
+  if (pct >= 80) return { label: "เกือบถึงเป้าแล้ว", color: "#8d7a4d", bg: "#f3eee0" };
+  if (pct >= 50) return { label: "ยังต้องสะสมเพิ่ม", color: "#8d7a4d", bg: "#f3eee0" };
+  return { label: "ควรปรับแผน", color: "#b0644c", bg: "#f6ebe5" };
 }
 
 export default function ReadinessGauge({ readinessPct }: Props) {
@@ -42,7 +42,7 @@ export default function ReadinessGauge({ readinessPct }: Props) {
           cy="80"
           r={R}
           fill="none"
-          stroke="#ef7350"
+          stroke="#87a892"
           strokeWidth="11"
           strokeLinecap="round"
           strokeDasharray={`${ARC} ${CIRCUMFERENCE}`}

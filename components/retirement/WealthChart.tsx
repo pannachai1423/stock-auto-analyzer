@@ -9,9 +9,9 @@ const W = 860;
 const H = 380;
 const PAD = { top: 24, right: 18, bottom: 36, left: 64 };
 
-const CORAL = "#ef7350";
-const GREEN = "#3e8e5d";
-const RED = "#c2502f";
+const CORAL = "#7fa38c";
+const GREEN = "#8499b1";
+const RED = "#b0644c";
 const MUTED = "#b3aa9b";
 const GRID = "#f0eadf";
 
@@ -191,7 +191,7 @@ export default function WealthChart({ plan }: Props) {
           </p>
           <p className="flex justify-between gap-4 text-[#8a8378]">
             <span>คาดการณ์</span>
-            <span className="font-semibold text-[#e05f3c]">{formatBaht(hover.expected)}</span>
+            <span className="font-semibold text-[#557f63]">{formatBaht(hover.expected)}</span>
           </p>
           <p className="flex justify-between gap-4 text-[#b3aa9b]">
             <span>กรณีดี / แย่</span>
@@ -210,13 +210,13 @@ export default function WealthChart({ plan }: Props) {
 
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px] text-[#9a9183]">
         <span className="flex items-center gap-2">
-          <i className="h-[3px] w-5 rounded bg-[#ef7350]" /> เส้นทางที่คาดไว้
+          <i className="h-[3px] w-5 rounded bg-[#7fa38c]" /> เส้นทางที่คาดไว้
         </span>
         <span className="flex items-center gap-2">
           <i className="h-2.5 w-5 rounded bg-[#786950]/10" /> ช่วงผลตอบแทน ±2%
         </span>
         <span className="flex items-center gap-2">
-          <i className="h-[2px] w-5 rounded border-t-2 border-dashed border-[#3e8e5d]" /> เงินก้อนเป้าหมาย
+          <i className="h-[2px] w-5 rounded border-t-2 border-dashed border-[#8499b1]" /> เงินก้อนเป้าหมาย
         </span>
       </div>
     </div>
