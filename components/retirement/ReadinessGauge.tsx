@@ -12,11 +12,11 @@ const R = 66;
 const CIRCUMFERENCE = 2 * Math.PI * R;
 const ARC = CIRCUMFERENCE * 0.75; // 270° arc
 
-function verdict(pct: number): { label: string; tone: string } {
-  if (pct >= 100) return { label: "พร้อมเกษียณ", tone: "text-[#9dbfa9]" };
-  if (pct >= 80) return { label: "เกือบถึงเป้า", tone: "text-[#e9cd92]" };
-  if (pct >= 50) return { label: "ยังต้องสะสมเพิ่ม", tone: "text-[#e9cd92]" };
-  return { label: "ควรปรับแผน", tone: "text-[#cf8d7a]" };
+function verdict(pct: number): { label: string; color: string; bg: string } {
+  if (pct >= 100) return { label: "พร้อมเกษียณแล้ว", color: "#3e8e5d", bg: "#e7f3eb" };
+  if (pct >= 80) return { label: "เกือบถึงเป้าแล้ว", color: "#b07c1f", bg: "#f9efd9" };
+  if (pct >= 50) return { label: "ยังต้องสะสมเพิ่ม", color: "#b07c1f", bg: "#f9efd9" };
+  return { label: "ควรปรับแผน", color: "#c2502f", bg: "#fbe9e2" };
 }
 
 export default function ReadinessGauge({ readinessPct }: Props) {
@@ -32,8 +32,8 @@ export default function ReadinessGauge({ readinessPct }: Props) {
           cy="80"
           r={R}
           fill="none"
-          stroke="rgba(255,255,255,0.07)"
-          strokeWidth="6"
+          stroke="#f0eadf"
+          strokeWidth="11"
           strokeLinecap="round"
           strokeDasharray={`${ARC} ${CIRCUMFERENCE}`}
         />
@@ -42,8 +42,8 @@ export default function ReadinessGauge({ readinessPct }: Props) {
           cy="80"
           r={R}
           fill="none"
-          stroke="#debc7c"
-          strokeWidth="6"
+          stroke="#ef7350"
+          strokeWidth="11"
           strokeLinecap="round"
           strokeDasharray={`${ARC} ${CIRCUMFERENCE}`}
           initial={{ strokeDashoffset: ARC }}
@@ -51,14 +51,19 @@ export default function ReadinessGauge({ readinessPct }: Props) {
           transition={{ type: "spring", stiffness: 50, damping: 18 }}
         />
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-3">
-        <span className="rt-display text-[42px] font-medium leading-none tracking-tight text-stone-100">
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-4">
+        <span className="rt-display text-[40px] font-medium leading-none text-[#3b362e]">
           {Math.round(shown)}
+          <span className="text-lg text-[#b3aa9b]">%</span>
         </span>
-        <span className="mt-1 text-[11px] tracking-[0.2em] text-stone-500">เปอร์เซ็นต์</span>
       </div>
-      <p className={`-mt-5 text-sm ${v.tone}`}>{v.label}</p>
-      <p className="mt-1 text-center text-[11px] leading-4 text-stone-600">
+      <span
+        className="rt-display -mt-5 rounded-full px-3.5 py-1 text-[13px]"
+        style={{ color: v.color, background: v.bg }}
+      >
+        {v.label}
+      </span>
+      <p className="mt-2 text-center text-[11px] leading-4 text-[#b3aa9b]">
         เทียบกับเงินก้อนที่ต้องมี ณ วันเกษียณ
       </p>
     </div>

@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Noto_Sans_Thai, Trirong } from "next/font/google";
+import { Anuphan, Mitr } from "next/font/google";
 
-const thaiDisplay = Trirong({
+const thaiDisplay = Mitr({
   subsets: ["thai", "latin"],
   weight: ["400", "500", "600"],
   variable: "--font-rt-display"
 });
 
-const thaiBody = Noto_Sans_Thai({
+const thaiBody = Anuphan({
   subsets: ["thai", "latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600"],
   variable: "--font-rt-body"
 });
 
@@ -34,76 +34,75 @@ body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
 }
 
 .rt-root {
-  font-family: var(--font-rt-body), "Noto Sans Thai", sans-serif;
+  font-family: var(--font-rt-body), "Anuphan", sans-serif;
   font-feature-settings: "tnum";
-  background: #0c0c0e;
-  color: #e9e6df;
+  background: #faf8f3;
+  color: #3b362e;
 }
 .rt-display {
-  font-family: var(--font-rt-display), "Trirong", serif;
+  font-family: var(--font-rt-display), "Mitr", sans-serif;
 }
-.rt-root ::selection { background: rgba(222, 188, 124, 0.3); color: #f5f2ea; }
+.rt-root ::selection { background: rgba(239, 115, 80, 0.2); color: #3b362e; }
 .rt-root::-webkit-scrollbar { width: 10px; }
-.rt-root::-webkit-scrollbar-thumb { background: rgba(222, 188, 124, 0.2); border-radius: 999px; }
-.rt-root::-webkit-scrollbar-thumb:hover { background: rgba(222, 188, 124, 0.4); }
-
-/* quiet film grain so large dark areas don't look flat */
-.rt-grain {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-  opacity: 0.05;
-}
+.rt-root::-webkit-scrollbar-thumb { background: #e3dccd; border-radius: 999px; }
+.rt-root::-webkit-scrollbar-thumb:hover { background: #d4cab6; }
 
 .rt-panel {
-  background: rgba(255, 255, 255, 0.022);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 1.25rem;
+  background: #ffffff;
+  border: 1px solid #ede7db;
+  border-radius: 1.5rem;
+  box-shadow: 0 1px 2px rgba(80, 65, 40, 0.03), 0 10px 28px -16px rgba(80, 65, 40, 0.1);
 }
 
-/* understated range slider — thin track, solid brass thumb */
+/* friendly range slider — soft track, white thumb with coral ring */
 .rt-range {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 3px;
+  height: 6px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, #debc7c, #debc7c) 0 / var(--rt-fill, 50%) 100% no-repeat,
-    rgba(255, 255, 255, 0.13);
+    linear-gradient(90deg, #ef7350, #f08a59) 0 / var(--rt-fill, 50%) 100% no-repeat,
+    #f0eadf;
   outline: none;
   cursor: pointer;
 }
 .rt-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
-  background: #e9cd92;
-  border: none;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+  background: #ffffff;
+  border: 2.5px solid #ef7350;
+  box-shadow: 0 2px 6px rgba(80, 65, 40, 0.18);
   transition: transform 0.15s;
 }
-.rt-range:hover::-webkit-slider-thumb { transform: scale(1.18); }
-.rt-range::-webkit-slider-thumb:active { transform: scale(1.3); }
+.rt-range:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.rt-range::-webkit-slider-thumb:active { transform: scale(1.25); }
 .rt-range::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
-  background: #e9cd92;
-  border: none;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+  background: #ffffff;
+  border: 2.5px solid #ef7350;
+  box-shadow: 0 2px 6px rgba(80, 65, 40, 0.18);
+}
+.rt-range:focus-visible {
+  box-shadow: 0 0 0 3px rgba(239, 115, 80, 0.25);
 }
 
 .rt-num {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.6rem;
-  color: #e9e6df;
-  transition: border-color 0.2s;
+  background: #faf8f3;
+  border: 1px solid #e7dfd0;
+  border-radius: 0.7rem;
+  color: #3b362e;
+  transition: border-color 0.2s, background 0.2s;
 }
 .rt-num:focus {
   outline: none;
-  border-color: rgba(222, 188, 124, 0.55);
+  background: #ffffff;
+  border-color: #ef7350;
 }
 .rt-num::-webkit-outer-spin-button, .rt-num::-webkit-inner-spin-button {
   -webkit-appearance: none;

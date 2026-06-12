@@ -41,12 +41,12 @@ export function SliderField({
   return (
     <label className="block">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="text-[13px] text-stone-400">{label}</span>
+        <span className="text-[13px] font-medium text-[#6f675c]">{label}</span>
         <span className="flex items-baseline gap-1.5">
           <input
             type="text"
             inputMode="decimal"
-            className="rt-num w-28 px-2.5 py-1 text-right text-sm font-medium text-[#e9cd92]"
+            className="rt-num w-28 px-2.5 py-1 text-right text-sm font-semibold text-[#e05f3c]"
             value={draft ?? (format ? format(value) : String(value))}
             onChange={(e) => setDraft(e.target.value)}
             onFocus={() => setDraft(String(value))}
@@ -54,7 +54,7 @@ export function SliderField({
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             aria-label={label}
           />
-          <span className="text-[11px] text-stone-500">{unit}</span>
+          <span className="text-[11px] text-[#b3aa9b]">{unit}</span>
         </span>
       </div>
       <input
@@ -67,7 +67,7 @@ export function SliderField({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      {hint && <p className="mt-1.5 text-[11px] leading-4 text-stone-600">{hint}</p>}
+      {hint && <p className="mt-1.5 text-[11px] leading-4 text-[#b3aa9b]">{hint}</p>}
     </label>
   );
 }

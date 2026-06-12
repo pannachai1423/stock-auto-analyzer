@@ -9,10 +9,11 @@ const W = 860;
 const H = 380;
 const PAD = { top: 24, right: 18, bottom: 36, left: 64 };
 
-const BRASS = "#debc7c";
-const SAGE = "#9dbfa9";
-const CLAY = "#cf8d7a";
-const MUTED = "#6f6c66";
+const CORAL = "#ef7350";
+const GREEN = "#3e8e5d";
+const RED = "#c2502f";
+const MUTED = "#b3aa9b";
+const GRID = "#f0eadf";
 
 interface Props {
   plan: PlanResult;
@@ -81,15 +82,15 @@ export default function WealthChart({ plan }: Props) {
       >
         <defs>
           <linearGradient id="rt-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={BRASS} stopOpacity="0.16" />
-            <stop offset="100%" stopColor={BRASS} stopOpacity="0" />
+            <stop offset="0%" stopColor={CORAL} stopOpacity="0.14" />
+            <stop offset="100%" stopColor={CORAL} stopOpacity="0" />
           </linearGradient>
         </defs>
 
         {/* gridlines + axis labels */}
         {geom.gridVals.map((v) => (
           <g key={v}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="rgba(255,255,255,0.055)" />
+            <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke={GRID} />
             <text x={PAD.left - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill={MUTED}>
               {formatBahtCompact(v)}
             </text>
@@ -105,15 +106,15 @@ export default function WealthChart({ plan }: Props) {
         </text>
 
         {/* optimistic–pessimistic band */}
-        <path d={geom.band} fill="rgba(255,255,255,0.045)" />
+        <path d={geom.band} fill="rgba(120, 105, 80, 0.06)" />
 
         {/* expected area + line */}
         <path d={geom.area} fill="url(#rt-area)" />
         <motion.path
           d={geom.line((p) => p.expected)}
           fill="none"
-          stroke={BRASS}
-          strokeWidth="2.25"
+          stroke={CORAL}
+          strokeWidth="2.5"
           strokeLinecap="round"
           initial={{ pathLength: 0 }}
           animate={{ pathLength: 1 }}
@@ -128,12 +129,12 @@ export default function WealthChart({ plan }: Props) {
               x2={W - PAD.right}
               y1={y(requiredFund)}
               y2={y(requiredFund)}
-              stroke={SAGE}
-              strokeWidth="1.25"
+              stroke={GREEN}
+              strokeWidth="1.5"
               strokeDasharray="2 5"
               opacity="0.8"
             />
-            <text x={W - PAD.right} y={y(requiredFund) - 6} textAnchor="end" fontSize="11" fill={SAGE}>
+            <text x={W - PAD.right} y={y(requiredFund) - 6} textAnchor="end" fontSize="11" fill={GREEN}>
               เป้าหมาย {formatBahtCompact(requiredFund)}
             </text>
           </g>
@@ -145,19 +146,19 @@ export default function WealthChart({ plan }: Props) {
           x2={x(input.retireAge)}
           y1={PAD.top}
           y2={H - PAD.bottom}
-          stroke="rgba(255,255,255,0.18)"
-          strokeWidth="1"
+          stroke="#d8cfbd"
+          strokeWidth="1.25"
           strokeDasharray="3 5"
         />
-        <text x={x(input.retireAge) + 6} y={PAD.top + 12} fontSize="11" fill="#a8a49c">
+        <text x={x(input.retireAge) + 6} y={PAD.top + 12} fontSize="11" fill="#9a9183">
           เกษียณ {input.retireAge}
         </text>
 
         {/* depletion marker */}
         {depletionAge !== null && (
           <g>
-            <circle cx={x(depletionAge)} cy={y(0)} r="4" fill={CLAY} />
-            <text x={x(depletionAge)} y={y(0) - 10} textAnchor="middle" fontSize="11" fill={CLAY}>
+            <circle cx={x(depletionAge)} cy={y(0)} r="4.5" fill={RED} />
+            <text x={x(depletionAge)} y={y(0) - 10} textAnchor="middle" fontSize="11" fill={RED}>
               เงินหมดอายุ {depletionAge}
             </text>
           </g>
@@ -171,35 +172,35 @@ export default function WealthChart({ plan }: Props) {
               x2={x(hover.age)}
               y1={PAD.top}
               y2={H - PAD.bottom}
-              stroke="rgba(233,230,223,0.25)"
+              stroke="#d8cfbd"
             />
-            <circle cx={x(hover.age)} cy={y(hover.expected)} r="4.5" fill="#0c0c0e" stroke={BRASS} strokeWidth="2" />
+            <circle cx={x(hover.age)} cy={y(hover.expected)} r="5" fill="#ffffff" stroke={CORAL} strokeWidth="2.5" />
           </g>
         )}
       </svg>
 
       {hover && (
         <div
-          className="pointer-events-none absolute top-3 z-10 min-w-[180px] rounded-xl border border-white/10 bg-[#161613]/95 px-4 py-3 text-xs backdrop-blur"
+          className="pointer-events-none absolute top-3 z-10 min-w-[185px] rounded-2xl border border-[#ede7db] bg-white px-4 py-3 text-xs shadow-lg shadow-[#50412808]"
           style={{
-            left: `clamp(0%, ${((x(hover.age) / W) * 100).toFixed(1)}% - 90px, calc(100% - 190px))`
+            left: `clamp(0%, ${((x(hover.age) / W) * 100).toFixed(1)}% - 92px, calc(100% - 195px))`
           }}
         >
-          <p className="rt-display mb-1.5 text-sm text-stone-100">
+          <p className="rt-display mb-1.5 text-sm text-[#3b362e]">
             อายุ {hover.age} ปี · พ.ศ. {hover.yearBE}
           </p>
-          <p className="flex justify-between gap-4 text-stone-400">
+          <p className="flex justify-between gap-4 text-[#8a8378]">
             <span>คาดการณ์</span>
-            <span className="font-medium text-[#e9cd92]">{formatBaht(hover.expected)}</span>
+            <span className="font-semibold text-[#e05f3c]">{formatBaht(hover.expected)}</span>
           </p>
-          <p className="flex justify-between gap-4 text-stone-500">
+          <p className="flex justify-between gap-4 text-[#b3aa9b]">
             <span>กรณีดี / แย่</span>
             <span>
               {formatBahtCompact(hover.optimistic)} / {formatBahtCompact(hover.pessimistic)}
             </span>
           </p>
           {hover.withdrawal > 0 && (
-            <p className="flex justify-between gap-4 text-stone-500">
+            <p className="flex justify-between gap-4 text-[#b3aa9b]">
               <span>ถอนใช้ปีนั้น</span>
               <span>{formatBahtCompact(hover.withdrawal)}</span>
             </p>
@@ -207,15 +208,15 @@ export default function WealthChart({ plan }: Props) {
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px] text-stone-500">
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px] text-[#9a9183]">
         <span className="flex items-center gap-2">
-          <i className="h-[2px] w-5 rounded bg-[#debc7c]" /> เส้นทางที่คาดไว้
+          <i className="h-[3px] w-5 rounded bg-[#ef7350]" /> เส้นทางที่คาดไว้
         </span>
         <span className="flex items-center gap-2">
-          <i className="h-2.5 w-5 rounded bg-white/10" /> ช่วงผลตอบแทน ±2%
+          <i className="h-2.5 w-5 rounded bg-[#786950]/10" /> ช่วงผลตอบแทน ±2%
         </span>
         <span className="flex items-center gap-2">
-          <i className="h-[2px] w-5 rounded border-t border-dashed border-[#9dbfa9]" /> เงินก้อนเป้าหมาย
+          <i className="h-[2px] w-5 rounded border-t-2 border-dashed border-[#3e8e5d]" /> เงินก้อนเป้าหมาย
         </span>
       </div>
     </div>
