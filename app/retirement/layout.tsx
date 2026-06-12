@@ -24,6 +24,15 @@ export const metadata: Metadata = {
  * Everything is namespaced with `rt-` so nothing leaks into the rest of the app.
  */
 const css = `
+/* While the planner is on screen, hide the host app chrome (navbar/footer/toaster)
+   without touching their source files — they live in sibling stacking contexts
+   that would otherwise paint above this fixed overlay. */
+body:has(.rt-root) > header,
+body:has(.rt-root) > footer,
+body:has(.rt-root) > div.pointer-events-none.fixed.bottom-5 {
+  display: none;
+}
+
 .rt-root {
   font-family: var(--font-rt-body), "Noto Sans Thai", sans-serif;
   font-feature-settings: "tnum";
