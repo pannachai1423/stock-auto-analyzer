@@ -700,7 +700,33 @@ export default function PhotoboothFlow() {
               </div>
               <p className="mt-3 text-center text-xs text-cocoaSoft">{t.booth.shotsInfo}</p>
 
-              <h2 className="mt-6 font-display text-lg">{t.booth.step2}</h2>
+              <h2 className="mt-6 font-display text-lg">{t.booth.stepFrame}</h2>
+              <div className="mt-3 flex gap-2.5 overflow-x-auto pb-2">
+                {FRAMES.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setFrame(f.id)}
+                    className={`shrink-0 rounded-2xl border-2 p-1.5 transition-all ${
+                      frame === f.id
+                        ? "border-blossom-400 shadow-bubble scale-105"
+                        : "border-white/70 hover:bg-white/60"
+                    }`}
+                  >
+                    <span
+                      className="flex h-16 w-12 items-center justify-center rounded-lg text-lg shadow-inner"
+                      style={{ backgroundColor: f.bg, color: f.text, ...patternStyle(f.decor, 0.5) }}
+                    >
+                      {f.decor ? (f.decor.bar ? f.decor.corner : f.decor.top[0]) : ""}
+                    </span>
+                    <span className="mt-1 block w-12 truncate text-center text-[10px] font-semibold text-cocoa">
+                      {t.frames[f.id]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-center text-xs text-cocoaSoft">{t.booth.frameInfo}</p>
+
+              <h2 className="mt-6 font-display text-lg">{t.booth.step3}</h2>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {CATEGORIES.map((c) => (
                   <button
@@ -844,6 +870,9 @@ export default function PhotoboothFlow() {
                   {t.booth.beautyHint}
                 </span>
               </div>
+              <p className="mt-2 text-center">
+                <span className="chip text-xs">🖼️ {t.frames[frame]}</span>
+              </p>
             </div>
 
             {/* controls */}
