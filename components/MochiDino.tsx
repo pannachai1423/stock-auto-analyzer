@@ -27,8 +27,8 @@ interface BurstHeart {
 
 /**
  * The official Mochi Dino — always rendered from the real brand artwork.
- * He floats, breathes, blinks, leans toward the cursor, and does a happy
- * jump (with a burst of hearts) when tapped.
+ * He floats, breathes, blinks, follows the cursor with his eyes (and a soft
+ * body lean), and does a happy jump (with a burst of hearts) when tapped.
  */
 export default function MochiDino({
   pose = "hero",
@@ -51,6 +51,11 @@ export default function MochiDino({
   const rotate = useTransform(sx, [-1, 1], [-5, 5]);
   const tx = useTransform(sx, [-1, 1], [-10, 10]);
   const ty = useTransform(sy, [-1, 1], [-6, 6]);
+  // pupils gaze toward the cursor (a few px, scaled to Mochi's size)
+  const eyeRangeX = size * 0.014;
+  const eyeRangeY = size * 0.009;
+  const eyeTX = useTransform(sx, [-1, 1], [-eyeRangeX, eyeRangeX]);
+  const eyeTY = useTransform(sy, [-1, 1], [-eyeRangeY, eyeRangeY]);
 
   useEffect(() => {
     if (!interactive) return;
@@ -125,16 +130,34 @@ export default function MochiDino({
           />
           {showEyelids && (
             <>
-              {/* eyelids positioned over the raster eyes so Mochi can blink */}
+              {/* gaze-following eyes drawn over the artwork eyes (identical at rest,
+                  they slide toward the cursor so Mochi looks where you point) */}
+              <motion.span
+                aria-hidden
+                className="absolute rounded-[50%] bg-[#3a2c25]"
+                style={{ left: "39.4%", top: "29.7%", width: "13.4%", height: "13.4%", x: eyeTX, y: eyeTY }}
+              >
+                <span className="absolute rounded-full bg-white/90" style={{ left: "20%", top: "15%", width: "32%", height: "26%" }} />
+                <span className="absolute rounded-full bg-white/70" style={{ left: "56%", top: "56%", width: "16%", height: "14%" }} />
+              </motion.span>
+              <motion.span
+                aria-hidden
+                className="absolute rounded-[50%] bg-[#3a2c25]"
+                style={{ left: "72.38%", top: "26.1%", width: "11.45%", height: "13.4%", x: eyeTX, y: eyeTY }}
+              >
+                <span className="absolute rounded-full bg-white/90" style={{ left: "20%", top: "15%", width: "33%", height: "26%" }} />
+                <span className="absolute rounded-full bg-white/70" style={{ left: "56%", top: "56%", width: "16%", height: "14%" }} />
+              </motion.span>
+              {/* eyelids on top so Mochi can still blink */}
               <span
                 aria-hidden
                 className="mochi-eyelid absolute rounded-[50%] bg-[#d5deb0]"
-                style={{ left: "39.9%", top: "30.2%", width: "12.4%", height: "12.4%" }}
+                style={{ left: "39.0%", top: "29.3%", width: "14.1%", height: "14.1%" }}
               />
               <span
                 aria-hidden
                 className="mochi-eyelid absolute rounded-[50%] bg-[#e4ecbf]"
-                style={{ left: "72.8%", top: "26.6%", width: "10.6%", height: "12.4%" }}
+                style={{ left: "72.0%", top: "25.7%", width: "12.1%", height: "14.1%" }}
               />
             </>
           )}
