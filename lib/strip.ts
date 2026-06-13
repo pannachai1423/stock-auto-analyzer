@@ -160,7 +160,36 @@ export function applyFx(
   }
 }
 
-/** Draws a designed frame (emoji border + official Mochi art) onto the strip. */
+/** Draws a patterned background (gingham / dots) over the base color. */
+function drawFramePattern(
+  ctx: CanvasRenderingContext2D,
+  geo: StripGeometry,
+  decor: FrameDecor
+) {
+  if (!decor.pattern) return;
+  const ink = decor.patternColor ?? "rgba(0,0,0,0.15)";
+  ctx.save();
+  if (decor.pattern === "gingham") {
+    const cell = 22;
+    ctx.fillStyle = ink;
+    // overlapping translucent bands give the classic gingham look
+    for (let x = 0; x < geo.width; x += cell * 2) ctx.fillRect(x, 0, cell, geo.height);
+    for (let y = 0; y < geo.height; y += cell * 2) ctx.fillRect(0, y, geo.width, cell);
+  } else if (decor.pattern === "dots") {
+    ctx.fillStyle = ink;
+    const gap = 26;
+    for (let y = gap / 2; y < geo.height; y += gap) {
+      for (let x = gap / 2; x < geo.width; x += gap) {
+        ctx.beginPath();
+        ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/** Draws the frame trim: top bar, emoji border, corners and official Mochi art. */
 async function drawFrameDecor(
   ctx: CanvasRenderingContext2D,
   geo: StripGeometry,
@@ -170,17 +199,27 @@ async function drawFrameDecor(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // top border row
-  ctx.font = "14px serif";
-  ctx.globalAlpha = 0.95;
-  let e = 0;
-  for (let x = geo.pad + 10; x <= geo.width - geo.pad - 10; x += 52) {
-    ctx.fillText(decor.top[e % decor.top.length], x, 13);
-    e++;
+  // booth-receipt top label bar
+  if (decor.bar) {
+    ctx.fillStyle = decor.patternColor ?? "rgba(255,255,255,0.9)";
+    ctx.font = "700 12px 'Quicksand', sans-serif";
+    ctx.fillText(decor.bar, geo.width / 2, 13);
+  } else {
+    // top border row
+    ctx.font = "14px serif";
+    ctx.globalAlpha = 0.95;
+    let e = 0;
+    for (let x = geo.pad + 10; x <= geo.width - geo.pad - 10; x += 52) {
+      ctx.fillText(decor.top[e % decor.top.length], x, 13);
+      e++;
+    }
+    ctx.globalAlpha = 1;
   }
 
   // corners
   ctx.font = "16px serif";
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = decor.patternColor ?? "rgba(0,0,0,0.8)";
   ctx.fillText(decor.corner, 13, 13);
   ctx.fillText(decor.corner, geo.width - 13, 13);
   ctx.fillText(decor.corner, 13, geo.height - 14);
@@ -243,6 +282,7 @@ export async function composeStrip(opts: ComposeOptions): Promise<string> {
 
   ctx.fillStyle = frame.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (frame.decor) drawFramePattern(ctx, geo, frame.decor);
 
   const supportsFilter = typeof ctx.filter === "string";
   const images = await Promise.all(opts.photos.slice(0, opts.count).map(loadImage));
@@ -262,12 +302,18 @@ export async function composeStrip(opts: ComposeOptions): Promise<string> {
   // caption
   ctx.fillStyle = frame.text;
   ctx.textAlign = "center";
+  if (frame.decor?.label) {
+    ctx.font = "600 15px 'Baloo 2', cursive";
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(frame.decor.label, geo.width / 2, geo.captionY + 16);
+    ctx.globalAlpha = 1;
+  }
   ctx.font = "600 22px 'Baloo 2', 'Comic Sans MS', cursive";
-  ctx.fillText("Dear Memory", geo.width / 2, geo.captionY + 36);
+  ctx.fillText("Dear Memory", geo.width / 2, geo.captionY + 40);
   ctx.font = "500 14px 'Quicksand', sans-serif";
   ctx.globalAlpha = 0.85;
   const caption = opts.title ? `${opts.title}  ·  ${opts.dateLabel}` : opts.dateLabel;
-  ctx.fillText(caption, geo.width / 2, geo.captionY + 60);
+  ctx.fillText(caption, geo.width / 2, geo.captionY + 62);
   ctx.globalAlpha = 1;
 
   if (frame.decor) await drawFrameDecor(ctx, geo, frame.decor);

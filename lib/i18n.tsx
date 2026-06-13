@@ -123,6 +123,8 @@ const en = {
     "y2k-flash": "Y2K Flash",
     "vintage-film": "Vintage Film",
     "mono-film": "Mono Film",
+    "bunny-film": "Bunny Film",
+    "studio-mood": "Studio Mood",
     "anime-style": "Anime Style"
   },
   frames: {
@@ -134,7 +136,11 @@ const en = {
     night: "Starry Night",
     "mochi-party": "Mochi Party",
     hearts: "Lovey Hearts",
-    stars: "Starry Sky"
+    stars: "Starry Sky",
+    "keep-close": "Keep You Close",
+    "tiny-love": "Tiny Love",
+    "bunny-shoot": "Bunny Shoot",
+    "furry-room": "Furry Room"
   },
   achievements: {
     "first-memory": { label: "First Memory", description: "Saved your very first memory" },
@@ -427,6 +433,8 @@ const th: Dict = {
     "y2k-flash": "แฟลช Y2K",
     "vintage-film": "ฟิล์มวินเทจ",
     "mono-film": "ฟิล์มขาวดำ",
+    "bunny-film": "บันนี่ฟิล์ม",
+    "studio-mood": "สตูดิโอมู้ด",
     "anime-style": "สไตล์อนิเมะ"
   },
   frames: {
@@ -438,7 +446,11 @@ const th: Dict = {
     night: "คืนดาวพราว",
     "mochi-party": "ปาร์ตี้โมจิ",
     hearts: "หัวใจฟูฟ่อง",
-    stars: "ฟ้าดาวพราว"
+    stars: "ฟ้าดาวพราว",
+    "keep-close": "Keep You Close",
+    "tiny-love": "Tiny Love",
+    "bunny-shoot": "บันนี่ชูต",
+    "furry-room": "Furry Room"
   },
   achievements: {
     "first-memory": { label: "ความทรงจำแรก", description: "เก็บความทรงจำแรกของคุณสำเร็จ" },

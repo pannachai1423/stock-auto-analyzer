@@ -11,6 +11,8 @@ export type FilterId =
   | "y2k-flash"
   | "vintage-film"
   | "mono-film"
+  | "bunny-film"
+  | "studio-mood"
   | "anime-style";
 
 export type FrameId =
@@ -22,7 +24,11 @@ export type FrameId =
   | "night"
   | "mochi-party"
   | "hearts"
-  | "stars";
+  | "stars"
+  | "keep-close"
+  | "tiny-love"
+  | "bunny-shoot"
+  | "furry-room";
 
 export type CategoryId =
   | "love"

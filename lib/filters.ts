@@ -96,6 +96,20 @@ export const FILTERS: FilterInfo[] = [
     fx: { grain: 0.16, vignette: 0.24 }
   },
   {
+    id: "bunny-film",
+    emoji: "🐰",
+    css: "grayscale(1) contrast(1.32) brightness(1.04)",
+    className: "filter-bunny-film",
+    fx: { grain: 0.2, vignette: 0.2 }
+  },
+  {
+    id: "studio-mood",
+    emoji: "🎬",
+    css: "brightness(0.93) contrast(1.2) saturate(0.74) hue-rotate(-6deg)",
+    className: "filter-studio-mood",
+    fx: { vignette: 0.46, grain: 0.1 }
+  },
+  {
     id: "anime-style",
     emoji: "✨",
     css: "contrast(1.25) saturate(1.55) brightness(1.05)",
@@ -105,7 +119,7 @@ export const FILTERS: FilterInfo[] = [
 
 export const filterById = (id: FilterId) => FILTERS.find((f) => f.id === id) ?? FILTERS[0];
 
-/** Decorative frame design: emoji border + official Mochi art in the caption corner. */
+/** Decorative frame design: patterned background, emoji border, label and Mochi art. */
 export interface FrameDecor {
   /** emojis cycled along the top border */
   top: string[];
@@ -113,6 +127,14 @@ export interface FrameDecor {
   corner: string;
   /** path to official Mochi artwork shown bottom-right (never redrawn) */
   mochi?: string;
+  /** background pattern drawn over the base color */
+  pattern?: "gingham" | "dots";
+  /** pattern ink color */
+  patternColor?: string;
+  /** cute caption label shown above "Dear Memory" (e.g. "keep you close ♡") */
+  label?: string;
+  /** optional top label-bar text, booth-receipt style (e.g. "THE FURRY ROOM") */
+  bar?: string;
 }
 
 export interface FrameInfo {
@@ -152,6 +174,58 @@ export const FRAMES: FrameInfo[] = [
     text: "#f6effc",
     swatchClass: "bg-[#3b3650]",
     decor: { top: ["⭐", "✨", "🌙"], corner: "✨", mochi: "/mochi/mochi-curious.png" }
+  },
+  {
+    id: "keep-close",
+    bg: "#e7f5e2",
+    text: "#5c7f53",
+    swatchClass: "bg-mint-100",
+    decor: {
+      top: ["💚", "🤍", "💚"],
+      corner: "♡",
+      mochi: "/mochi/mochi-happy.png",
+      pattern: "gingham",
+      patternColor: "rgba(132,189,120,0.28)",
+      label: "keep you close ♡"
+    }
+  },
+  {
+    id: "tiny-love",
+    bg: "#fff6f9",
+    text: "#a45a7c",
+    swatchClass: "bg-blossom-100",
+    decor: {
+      top: ["🎀", "💗", "🎀"],
+      corner: "♥",
+      mochi: "/mochi/mochi-waving.png",
+      pattern: "dots",
+      patternColor: "rgba(248,127,178,0.22)",
+      label: "tiny love ·ᴗ·"
+    }
+  },
+  {
+    id: "bunny-shoot",
+    bg: "#fbfbf7",
+    text: "#6b5b53",
+    swatchClass: "bg-cream-50",
+    decor: {
+      top: ["🐰", "🤍", "🐰"],
+      corner: "✿",
+      mochi: "/mochi/mochi-curious.png",
+      label: "bunny shoot ·ᴥ·"
+    }
+  },
+  {
+    id: "furry-room",
+    bg: "#23222b",
+    text: "#f3eef7",
+    swatchClass: "bg-[#23222b]",
+    decor: {
+      top: ["★", "✦", "★"],
+      corner: "✦",
+      mochi: "/mochi/mochi-excited.png",
+      bar: "THE FURRY ROOM ✦ 4CUTS"
+    }
   }
 ];
 

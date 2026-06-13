@@ -106,6 +106,12 @@ body {
 .filter-mono-film {
   filter: grayscale(1) contrast(1.08) brightness(1.06);
 }
+.filter-bunny-film {
+  filter: grayscale(1) contrast(1.32) brightness(1.04);
+}
+.filter-studio-mood {
+  filter: brightness(0.93) contrast(1.2) saturate(0.74) hue-rotate(-6deg);
+}
 .filter-kawaii-pink {
   filter: brightness(1.08) saturate(1.25) hue-rotate(-12deg) contrast(0.93);
 }

@@ -89,7 +89,24 @@ function FxOverlay({ fx, rounded }: { fx?: FilterFx; rounded?: number }) {
   );
 }
 
-/** live preview of a designed frame (emoji border + official Mochi art) */
+/** CSS background that mirrors the canvas gingham / dots pattern */
+function patternStyle(decor: FrameDecor | undefined, scale: number): React.CSSProperties {
+  if (!decor?.pattern) return {};
+  const ink = decor.patternColor ?? "rgba(0,0,0,0.15)";
+  if (decor.pattern === "gingham") {
+    const cell = 22 * scale;
+    return {
+      backgroundImage: `repeating-linear-gradient(90deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px), repeating-linear-gradient(0deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px)`
+    };
+  }
+  const gap = 26 * scale;
+  return {
+    backgroundImage: `radial-gradient(${ink} ${1.8 * scale}px, transparent ${1.9 * scale}px)`,
+    backgroundSize: `${gap}px ${gap}px`
+  };
+}
+
+/** live preview of a designed frame (border, bar, corners, official Mochi art) */
 function FrameDecorOverlay({
   decor,
   geo,
@@ -111,23 +128,33 @@ function FrameDecorOverlay({
       key={key}
       aria-hidden
       className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-      style={{ left: x * scale, top: y * scale, fontSize: 16 * scale }}
+      style={{ left: x * scale, top: y * scale, fontSize: 16 * scale, color: decor.patternColor }}
     >
       {decor.corner}
     </span>
   );
   return (
     <>
-      {tops.map((tp, idx) => (
+      {decor.bar ? (
         <span
-          key={idx}
           aria-hidden
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-          style={{ left: tp.x * scale, top: 13 * scale, fontSize: 14 * scale }}
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-body font-bold tracking-wide"
+          style={{ top: 13 * scale, fontSize: 12 * scale, color: decor.patternColor }}
         >
-          {tp.e}
+          {decor.bar}
         </span>
-      ))}
+      ) : (
+        tops.map((tp, idx) => (
+          <span
+            key={idx}
+            aria-hidden
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: tp.x * scale, top: 13 * scale, fontSize: 14 * scale }}
+          >
+            {tp.e}
+          </span>
+        ))
+      )}
       {corner(13, 13, "tl")}
       {corner(geo.width - 13, 13, "tr")}
       {corner(13, geo.height - 14, "bl")}
@@ -947,7 +974,8 @@ export default function PhotoboothFlow() {
                 style={{
                   width: geo.width * previewScale,
                   height: geo.height * previewScale,
-                  background: frameInfo.bg
+                  backgroundColor: frameInfo.bg,
+                  ...patternStyle(frameInfo.decor, previewScale)
                 }}
               >
                 {pickedPhotos.slice(0, layout.count).map((p, i) => {
@@ -977,9 +1005,17 @@ export default function PhotoboothFlow() {
                   );
                 })}
                 <div
-                  className="absolute inset-x-0 text-center"
-                  style={{ top: (geo.captionY + 18) * previewScale, color: frameInfo.text }}
+                  className="absolute inset-x-0 text-center leading-tight"
+                  style={{ top: (geo.captionY + 8) * previewScale, color: frameInfo.text }}
                 >
+                  {frameInfo.decor?.label && (
+                    <p
+                      className="font-display"
+                      style={{ fontSize: 15 * previewScale * 0.95, opacity: 0.9 }}
+                    >
+                      {frameInfo.decor.label}
+                    </p>
+                  )}
                   <p className="font-display" style={{ fontSize: 22 * previewScale * 0.95 }}>
                     Dear Memory
                   </p>
