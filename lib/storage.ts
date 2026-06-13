@@ -116,3 +116,56 @@ export function isReturningVisitor(): boolean {
 
 export const newId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/* ---------------- backup & restore ---------------- */
+
+export interface BackupBundle {
+  app: "dear-memory";
+  version: 1;
+  exportedAt: number;
+  memories: Memory[];
+  capsules: TimeCapsule[];
+  achievements: AchievementState[];
+}
+
+/** Collects everything the visitor has saved into one portable bundle. */
+export function exportData(): BackupBundle {
+  return {
+    app: "dear-memory",
+    version: 1,
+    exportedAt: Date.now(),
+    memories: loadMemories(),
+    capsules: loadCapsules(),
+    achievements: loadAchievements()
+  };
+}
+
+/** Merges a backup bundle into local storage (dedupes by id). Returns counts added. */
+export function importData(raw: unknown): { memories: number; capsules: number } {
+  const bundle = raw as Partial<BackupBundle>;
+  if (!bundle || bundle.app !== "dear-memory" || !Array.isArray(bundle.memories)) {
+    throw new Error("not a Dear Memory backup");
+  }
+
+  const mergeById = <T extends { id: string }>(existing: T[], incoming: T[] = []) => {
+    const map = new Map(existing.map((x) => [x.id, x]));
+    let added = 0;
+    for (const item of incoming) {
+      if (item && typeof item.id === "string" && !map.has(item.id)) {
+        map.set(item.id, item);
+        added += 1;
+      }
+    }
+    return { list: [...map.values()], added };
+  };
+
+  const mem = mergeById(loadMemories(), bundle.memories as Memory[]);
+  writeJson(MEMORIES_KEY, mem.list);
+  const cap = mergeById(loadCapsules(), (bundle.capsules as TimeCapsule[]) ?? []);
+  writeJson(CAPSULES_KEY, cap.list);
+
+  const ach = mergeById(loadAchievements(), (bundle.achievements as AchievementState[]) ?? []);
+  writeJson(ACHIEVEMENTS_KEY, ach.list);
+
+  return { memories: mem.added, capsules: cap.added };
+}

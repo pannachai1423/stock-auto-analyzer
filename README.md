@@ -46,6 +46,8 @@ In the app, Mochi:
 | Time capsules — seal letters for 6 months / 1 year / 5 years, animated envelope reveal | ✅ |
 | Gamification — achievements (First Memory, Time Traveler, Filter Fairy…) | ✅ |
 | 8 memory categories (💕 👯 🎂 🎓 👨‍👩‍👧 ✈️ 🌸 💌) | ✅ |
+| 📲 Installable PWA + offline support (service worker caches the whole app) | ✅ |
+| 💾 Backup & restore — export all memories to a file, restore on any device | ✅ |
 | PWA manifest + icons | ✅ |
 | Demo mode (no camera? pastel placeholder shots so the flow still works) | ✅ |
 

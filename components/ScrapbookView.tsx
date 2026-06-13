@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import MochiDino from "./MochiDino";
 import { mochiToast } from "./MochiToaster";
+import BackupCard from "./BackupCard";
 import { useLang } from "@/lib/i18n";
 import { shareImage } from "@/lib/share";
 import { CATEGORIES, categoryById } from "@/lib/categories";
@@ -180,6 +181,14 @@ export default function ScrapbookView() {
           })}
         </div>
       </section>
+
+      {/* backup & restore */}
+      <BackupCard
+        onImported={() => {
+          setMemories(loadMemories());
+          setUnlocked(new Set(loadAchievements().map((a) => a.id)));
+        }}
+      />
 
       {/* detail modal */}
       <AnimatePresence>

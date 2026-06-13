@@ -324,6 +324,22 @@ const en = {
     scrapbook: "📖 Scrapbook",
     capsule: "⏳ Time Capsule",
     madeWith: "Made with 💖, sparkles, and one very gentle dinosaur."
+  },
+  pwa: {
+    install: "Install app"
+  },
+  backup: {
+    title: "Backup & restore 💾",
+    blurb:
+      "Your memories live in this browser. Save them to a file so you never lose them — or move them to a new phone.",
+    export: "⬇️ Save backup",
+    import: "⬆️ Restore",
+    exportedTitle: "Backup saved!",
+    exportedBody: "Keep this file safe — it's all your memories 💖",
+    importedTitle: "Welcome back!",
+    importedBody: (n: number) => `Restored ${n} new memor${n === 1 ? "y" : "ies"}! 💌`,
+    importErrorTitle: "Hmm, that file looked shy…",
+    importErrorBody: "Please choose a Dear Memory backup file."
   }
 };
 
@@ -640,6 +656,22 @@ const th: Dict = {
     scrapbook: "📖 สมุดความทรงจำ",
     capsule: "⏳ แคปซูลเวลา",
     madeWith: "สร้างด้วย 💖 ประกายวิบวับ และไดโนเสาร์ใจดีหนึ่งตัว"
+  },
+  pwa: {
+    install: "ติดตั้งแอป"
+  },
+  backup: {
+    title: "สำรอง & กู้คืนข้อมูล 💾",
+    blurb:
+      "ความทรงจำของคุณเก็บอยู่ในเบราว์เซอร์นี้ เซฟเป็นไฟล์ไว้จะได้ไม่หาย — หรือย้ายไปเครื่อง/มือถือใหม่ได้",
+    export: "⬇️ เซฟไฟล์สำรอง",
+    import: "⬆️ กู้คืน",
+    exportedTitle: "เซฟไฟล์สำรองแล้ว!",
+    exportedBody: "เก็บไฟล์นี้ไว้ดีๆ นะ มันคือความทรงจำทั้งหมดของคุณ 💖",
+    importedTitle: "ยินดีต้อนรับกลับมา!",
+    importedBody: (n: number) => `กู้คืนความทรงจำใหม่ ${n} รายการแล้ว! 💌`,
+    importErrorTitle: "อืม ไฟล์นี้ดูเขินๆ…",
+    importErrorBody: "เลือกไฟล์สำรองของ Dear Memory นะคะ"
   }
 };
 

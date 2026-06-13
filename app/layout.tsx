@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FloatingBackground from "@/components/FloatingBackground";
 import MochiToaster from "@/components/MochiToaster";
+import PwaManager from "@/components/PwaManager";
 import { LangProvider } from "@/lib/i18n";
 
 const display = Baloo_2({
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="relative z-10 mx-auto w-[min(1080px,94vw)] pt-8">{children}</main>
           <Footer />
           <MochiToaster />
+          <PwaManager />
         </LangProvider>
       </body>
     </html>
