@@ -112,6 +112,12 @@ body {
 .filter-studio-mood {
   filter: brightness(0.93) contrast(1.2) saturate(0.74) hue-rotate(-6deg);
 }
+.filter-flashback {
+  filter: grayscale(1) sepia(0.55) contrast(1.08) brightness(1.02) saturate(1.4);
+}
+.filter-cozy-glow {
+  filter: brightness(1.1) contrast(0.94) saturate(1.18) sepia(0.12) hue-rotate(-6deg);
+}
 .filter-kawaii-pink {
   filter: brightness(1.08) saturate(1.25) hue-rotate(-12deg) contrast(0.93);
 }

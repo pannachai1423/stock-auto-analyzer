@@ -13,6 +13,8 @@ export type FilterId =
   | "mono-film"
   | "bunny-film"
   | "studio-mood"
+  | "flashback"
+  | "cozy-glow"
   | "anime-style";
 
 export type FrameId =
@@ -28,7 +30,11 @@ export type FrameId =
   | "keep-close"
   | "tiny-love"
   | "bunny-shoot"
-  | "furry-room";
+  | "furry-room"
+  | "tartan"
+  | "xmas"
+  | "heart-frame"
+  | "pink-stripe";
 
 export type CategoryId =
   | "love"

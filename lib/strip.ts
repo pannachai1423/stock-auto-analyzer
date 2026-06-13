@@ -168,6 +168,7 @@ function drawFramePattern(
 ) {
   if (!decor.pattern) return;
   const ink = decor.patternColor ?? "rgba(0,0,0,0.15)";
+  const ink2 = decor.patternColor2 ?? ink;
   ctx.save();
   if (decor.pattern === "gingham") {
     const cell = 22;
@@ -185,6 +186,19 @@ function drawFramePattern(
         ctx.fill();
       }
     }
+  } else if (decor.pattern === "plaid") {
+    // thick translucent bands (tartan body) + thin accent lines crossing
+    const cell = 40;
+    ctx.fillStyle = ink;
+    for (let x = 0; x < geo.width; x += cell * 2) ctx.fillRect(x, 0, cell, geo.height);
+    for (let y = 0; y < geo.height; y += cell * 2) ctx.fillRect(0, y, geo.width, cell);
+    ctx.fillStyle = ink2;
+    for (let x = cell / 2; x < geo.width; x += cell) ctx.fillRect(x, 0, 3, geo.height);
+    for (let y = cell / 2; y < geo.height; y += cell) ctx.fillRect(0, y, geo.width, 3);
+  } else if (decor.pattern === "stripe") {
+    const cell = 26;
+    ctx.fillStyle = ink;
+    for (let x = 0; x < geo.width; x += cell * 2) ctx.fillRect(x, 0, cell, geo.height);
   }
   ctx.restore();
 }
@@ -204,6 +218,24 @@ async function drawFrameDecor(
     ctx.fillStyle = decor.patternColor ?? "rgba(255,255,255,0.9)";
     ctx.font = "700 12px 'Quicksand', sans-serif";
     ctx.fillText(decor.bar, geo.width / 2, 13);
+  } else if (decor.border) {
+    // emoji border around the whole perimeter
+    ctx.font = "15px serif";
+    ctx.globalAlpha = 0.95;
+    let e = 0;
+    const step = 34;
+    for (let x = geo.pad - 6; x <= geo.width - geo.pad + 6; x += step) {
+      ctx.fillText(decor.top[e % decor.top.length], x, 12);
+      ctx.fillText(decor.top[(e + 1) % decor.top.length], x, geo.captionY - 8);
+      e++;
+    }
+    e = 0;
+    for (let y = 30; y <= geo.captionY - 24; y += step) {
+      ctx.fillText(decor.top[e % decor.top.length], 12, y);
+      ctx.fillText(decor.top[(e + 1) % decor.top.length], geo.width - 12, y);
+      e++;
+    }
+    ctx.globalAlpha = 1;
   } else {
     // top border row
     ctx.font = "14px serif";

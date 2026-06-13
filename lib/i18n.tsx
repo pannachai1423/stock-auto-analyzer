@@ -125,6 +125,8 @@ const en = {
     "mono-film": "Mono Film",
     "bunny-film": "Bunny Film",
     "studio-mood": "Studio Mood",
+    flashback: "Flashback",
+    "cozy-glow": "Cozy Glow",
     "anime-style": "Anime Style"
   },
   frames: {
@@ -140,7 +142,11 @@ const en = {
     "keep-close": "Keep You Close",
     "tiny-love": "Tiny Love",
     "bunny-shoot": "Bunny Shoot",
-    "furry-room": "Furry Room"
+    "furry-room": "Furry Room",
+    tartan: "Tartan",
+    xmas: "Merry & Cozy",
+    "heart-frame": "Heart Frame",
+    "pink-stripe": "Pink Stripe"
   },
   achievements: {
     "first-memory": { label: "First Memory", description: "Saved your very first memory" },
@@ -435,6 +441,8 @@ const th: Dict = {
     "mono-film": "ฟิล์มขาวดำ",
     "bunny-film": "บันนี่ฟิล์ม",
     "studio-mood": "สตูดิโอมู้ด",
+    flashback: "แฟลชแบ็ก",
+    "cozy-glow": "โคซี่โกลว์",
     "anime-style": "สไตล์อนิเมะ"
   },
   frames: {
@@ -450,7 +458,11 @@ const th: Dict = {
     "keep-close": "Keep You Close",
     "tiny-love": "Tiny Love",
     "bunny-shoot": "บันนี่ชูต",
-    "furry-room": "Furry Room"
+    "furry-room": "Furry Room",
+    tartan: "ลายสก็อต",
+    xmas: "คริสต์มาสอบอุ่น",
+    "heart-frame": "กรอบหัวใจ",
+    "pink-stripe": "ลายทางชมพู"
   },
   achievements: {
     "first-memory": { label: "ความทรงจำแรก", description: "เก็บความทรงจำแรกของคุณสำเร็จ" },

@@ -89,14 +89,28 @@ function FxOverlay({ fx, rounded }: { fx?: FilterFx; rounded?: number }) {
   );
 }
 
-/** CSS background that mirrors the canvas gingham / dots pattern */
+/** CSS background that mirrors the canvas gingham / dots / plaid / stripe pattern */
 function patternStyle(decor: FrameDecor | undefined, scale: number): React.CSSProperties {
   if (!decor?.pattern) return {};
   const ink = decor.patternColor ?? "rgba(0,0,0,0.15)";
+  const ink2 = decor.patternColor2 ?? ink;
   if (decor.pattern === "gingham") {
     const cell = 22 * scale;
     return {
       backgroundImage: `repeating-linear-gradient(90deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px), repeating-linear-gradient(0deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px)`
+    };
+  }
+  if (decor.pattern === "plaid") {
+    const cell = 40 * scale;
+    const line = 3 * scale;
+    return {
+      backgroundImage: `repeating-linear-gradient(90deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px), repeating-linear-gradient(0deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px), repeating-linear-gradient(90deg, ${ink2} 0 ${line}px, transparent ${line}px ${cell}px), repeating-linear-gradient(0deg, ${ink2} 0 ${line}px, transparent ${line}px ${cell}px)`
+    };
+  }
+  if (decor.pattern === "stripe") {
+    const cell = 26 * scale;
+    return {
+      backgroundImage: `repeating-linear-gradient(90deg, ${ink} 0 ${cell}px, transparent ${cell}px ${cell * 2}px)`
     };
   }
   const gap = 26 * scale;
@@ -123,6 +137,23 @@ function FrameDecorOverlay({
     tops.push({ x, e: decor.top[i % decor.top.length] });
     i++;
   }
+  // full-perimeter border positions (when decor.border)
+  const perim: { x: number; y: number; e: string }[] = [];
+  if (decor.border) {
+    let k = 0;
+    const step = 34;
+    for (let x = geo.pad - 6; x <= geo.width - geo.pad + 6; x += step) {
+      perim.push({ x, y: 8, e: decor.top[k % decor.top.length] });
+      perim.push({ x, y: geo.captionY - 10, e: decor.top[(k + 1) % decor.top.length] });
+      k++;
+    }
+    k = 0;
+    for (let y = 30; y <= geo.captionY - 24; y += step) {
+      perim.push({ x: 10, y, e: decor.top[k % decor.top.length] });
+      perim.push({ x: geo.width - 10, y, e: decor.top[(k + 1) % decor.top.length] });
+      k++;
+    }
+  }
   const corner = (x: number, y: number, key: string) => (
     <span
       key={key}
@@ -143,6 +174,17 @@ function FrameDecorOverlay({
         >
           {decor.bar}
         </span>
+      ) : decor.border ? (
+        perim.map((pt, idx) => (
+          <span
+            key={idx}
+            aria-hidden
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: pt.x * scale, top: pt.y * scale, fontSize: 15 * scale }}
+          >
+            {pt.e}
+          </span>
+        ))
       ) : (
         tops.map((tp, idx) => (
           <span

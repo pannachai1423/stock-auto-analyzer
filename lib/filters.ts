@@ -110,6 +110,20 @@ export const FILTERS: FilterInfo[] = [
     fx: { vignette: 0.46, grain: 0.1 }
   },
   {
+    id: "flashback",
+    emoji: "🤎",
+    css: "grayscale(1) sepia(0.55) contrast(1.08) brightness(1.02) saturate(1.4)",
+    className: "filter-flashback",
+    fx: { grain: 0.16, vignette: 0.3 }
+  },
+  {
+    id: "cozy-glow",
+    emoji: "🧣",
+    css: "brightness(1.1) contrast(0.94) saturate(1.18) sepia(0.12) hue-rotate(-6deg)",
+    className: "filter-cozy-glow",
+    fx: { glow: 0.24 }
+  },
+  {
     id: "anime-style",
     emoji: "✨",
     css: "contrast(1.25) saturate(1.55) brightness(1.05)",
@@ -128,9 +142,13 @@ export interface FrameDecor {
   /** path to official Mochi artwork shown bottom-right (never redrawn) */
   mochi?: string;
   /** background pattern drawn over the base color */
-  pattern?: "gingham" | "dots";
+  pattern?: "gingham" | "dots" | "plaid" | "stripe";
   /** pattern ink color */
   patternColor?: string;
+  /** secondary accent color (plaid thin lines) */
+  patternColor2?: string;
+  /** draw the emoji border around the whole perimeter, not just the top */
+  border?: boolean;
   /** cute caption label shown above "Dear Memory" (e.g. "keep you close ♡") */
   label?: string;
   /** optional top label-bar text, booth-receipt style (e.g. "THE FURRY ROOM") */
@@ -225,6 +243,64 @@ export const FRAMES: FrameInfo[] = [
       corner: "✦",
       mochi: "/mochi/mochi-excited.png",
       bar: "THE FURRY ROOM ✦ 4CUTS"
+    }
+  },
+  {
+    id: "tartan",
+    bg: "#7a1f1f",
+    text: "#ffe9d6",
+    swatchClass: "bg-[#7a1f1f]",
+    decor: {
+      top: ["🤎", "🏴", "🤎"],
+      corner: "✦",
+      mochi: "/mochi/mochi-curious.png",
+      pattern: "plaid",
+      patternColor: "rgba(255,210,170,0.16)",
+      patternColor2: "rgba(60,90,60,0.55)",
+      label: "flashback ·ᴗ·"
+    }
+  },
+  {
+    id: "xmas",
+    bg: "#e3f1de",
+    text: "#4f7a3f",
+    swatchClass: "bg-mint-100",
+    decor: {
+      top: ["🎄", "🎁", "🔔", "🍓", "⭐"],
+      corner: "🎀",
+      mochi: "/mochi/mochi-happy.png",
+      pattern: "plaid",
+      patternColor: "rgba(132,189,120,0.22)",
+      patternColor2: "rgba(248,127,178,0.3)",
+      border: true,
+      label: "merry & cozy ❄"
+    }
+  },
+  {
+    id: "heart-frame",
+    bg: "#fff1f5",
+    text: "#c2415e",
+    swatchClass: "bg-blossom-100",
+    decor: {
+      top: ["💗", "❤️", "💕"],
+      corner: "♥",
+      mochi: "/mochi/mochi-waving.png",
+      border: true,
+      label: "love you ♡"
+    }
+  },
+  {
+    id: "pink-stripe",
+    bg: "#ffeaf2",
+    text: "#a45a7c",
+    swatchClass: "bg-blossom-100",
+    decor: {
+      top: ["🎀", "💗", "🎀"],
+      corner: "♡",
+      mochi: "/mochi/mochi-excited.png",
+      pattern: "stripe",
+      patternColor: "rgba(255,158,199,0.5)",
+      label: "sweet ·ᴗ·"
     }
   }
 ];

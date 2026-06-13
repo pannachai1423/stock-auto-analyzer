@@ -31,8 +31,8 @@ In the app, Mochi:
 | Korean photobooth — front/rear camera, live preview, countdown, auto-capture, per-photo retake | ✅ |
 | 📸 Real booth flow: 8 shots taken, then pick your favorites (like Life4Cuts) | ✅ |
 | Layouts: classic 1×4 strip, 2×2 grid, 2×3 grid | ✅ |
-| 🖼️ Designed frames — Mochi Party, Lovey Hearts, Starry Sky, Keep You Close (gingham), Tiny Love (dots), Bunny Shoot, Furry Room (label bar) — official Mochi art in the corner + 6 solid pastels | ✅ |
-| 15 real-time filters (Korean Beauty, Soft Skin, Peach Cream, Milk Tea, Dreamy Glow, Fairy Glow, Kawaii Pink, Cool Girl, Y2K Flash, Vintage Film, Mono Film, Bunny Film, Studio Mood, Anime Style…) | ✅ |
+| 🖼️ 13 designed frames — Mochi Party, Lovey Hearts, Starry Sky, Keep You Close (gingham), Tiny Love (dots), Bunny Shoot, Furry Room (label bar), Tartan (plaid), Merry & Cozy (festive border), Heart Frame (heart border), Pink Stripe — official Mochi art in the corner + 6 solid pastels | ✅ |
+| 17 real-time filters (Korean Beauty, Soft Skin, Peach Cream, Milk Tea, Dreamy Glow, Fairy Glow, Kawaii Pink, Cool Girl, Y2K Flash, Vintage Film, Mono Film, Bunny Film, Studio Mood, Flashback, Cozy Glow, Anime Style…) | ✅ |
 | ✨ Real skin smoothing (3 levels) — YCbCr skin-zone detection, eyes/lips/hair stay sharp | ✅ |
 | 🎞️ Film effects baked into strips & GIFs — grain, vignette, soft glow per filter | ✅ |
 | Drag-and-drop decoration — hearts, stars, bows, flowers, official Mochi stickers, titles, date stamps, 6 frame colors | ✅ |
