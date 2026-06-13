@@ -662,15 +662,12 @@ const LangContext = createContext<LangContextValue>({
 });
 
 export function LangProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+  // Thai is the default language; a saved preference (via the toggle) wins.
+  const [lang, setLangState] = useState<Lang>("th");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(LANG_KEY) as Lang | null;
-    if (saved === "en" || saved === "th") {
-      setLangState(saved);
-    } else if (navigator.language?.toLowerCase().startsWith("th")) {
-      setLangState("th");
-    }
+    if (saved === "en" || saved === "th") setLangState(saved);
   }, []);
 
   const setLang = (next: Lang) => {
