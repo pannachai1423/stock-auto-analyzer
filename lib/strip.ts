@@ -376,11 +376,12 @@ export async function composeStrip(opts: ComposeOptions): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-/** Captures the current video frame (with optional skin smoothing) into a data URL. */
+/** Captures the current video frame (skin smoothing + optional AR overlay) into a data URL. */
 export function captureFrame(
   video: HTMLVideoElement,
   mirrored: boolean,
-  beauty: BeautyLevel = 0
+  beauty: BeautyLevel = 0,
+  onOverlay?: (ctx: CanvasRenderingContext2D, w: number, h: number) => void
 ): string {
   const canvas = document.createElement("canvas");
   const w = Math.min(video.videoWidth || 640, 960);
@@ -396,5 +397,15 @@ export function captureFrame(
   ctx.drawImage(video, 0, 0, w, h);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   smoothSkin(canvas, ctx, beauty);
+  // AR stickers are baked in the same (mirrored) space as the photo
+  if (onOverlay) {
+    ctx.save();
+    if (mirrored) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+    onOverlay(ctx, w, h);
+    ctx.restore();
+  }
   return canvas.toDataURL("image/jpeg", 0.9);
 }

@@ -33,6 +33,7 @@ In the app, Mochi:
 | Layouts: classic 1×4 strip, 2×2 grid, 2×3 grid | ✅ |
 | 🖼️ 13 designed frames — Mochi Party, Lovey Hearts, Starry Sky, Keep You Close (gingham), Tiny Love (dots), Bunny Shoot, Furry Room (label bar), Tartan (plaid), Merry & Cozy (festive border), Heart Frame (heart border), Pink Stripe — official Mochi art in the corner + 6 solid pastels | ✅ |
 | 17 real-time filters (Korean Beauty, Soft Skin, Peach Cream, Milk Tea, Dreamy Glow, Fairy Glow, Kawaii Pink, Cool Girl, Y2K Flash, Vintage Film, Mono Film, Bunny Film, Studio Mood, Flashback, Cozy Glow, Anime Style…) | ✅ |
+| 🪄 On-device AR face filters (bunny/cat/puppy ears, crown, glasses, heart eyes, flower crown, sparkle) — real-time face tracking via self-hosted MediaPipe, baked into the photos. Nothing leaves the device; degrades gracefully if unsupported | ✅ |
 | ✨ Real skin smoothing (3 levels) — YCbCr skin-zone detection, eyes/lips/hair stay sharp | ✅ |
 | 🎞️ Film effects baked into strips & GIFs — grain, vignette, soft glow per filter | ✅ |
 | Drag-and-drop decoration — hearts, stars, bows, flowers, official Mochi stickers, titles, date stamps, 6 frame colors | ✅ |
@@ -64,7 +65,12 @@ needed.
 
 ## 🛠 Tech
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS · Framer Motion
+Next.js 15 (App Router) · TypeScript · Tailwind CSS · Framer Motion ·
+MediaPipe Tasks Vision (self-hosted, on-device face landmarks)
+
+The MediaPipe wasm runtime and face-landmarker model are served from
+`public/mediapipe/` (no third-party CDN), loaded lazily only when an AR
+filter is first selected, and cached by the service worker for offline use.
 
 ```bash
 npm install

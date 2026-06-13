@@ -129,6 +129,17 @@ const en = {
     "cozy-glow": "Cozy Glow",
     "anime-style": "Anime Style"
   },
+  arFilters: {
+    none: "Off",
+    bunny: "Bunny",
+    cat: "Cat",
+    puppy: "Puppy",
+    crown: "Crown",
+    glasses: "Glasses",
+    hearts: "Heart eyes",
+    flower: "Flower crown",
+    sparkle: "Sparkle"
+  },
   frames: {
     cream: "Cream",
     pink: "Baby Pink",
@@ -176,6 +187,10 @@ const en = {
     beautySoft: "Soft",
     beautyMax: "Extra glow",
     beautyHint: "Smooths skin only — eyes, lips & hair stay sharp. You'll see it in the captured photos!",
+    arTitle: "🪄 AR face",
+    arHint: "On-device AI face filters — nothing leaves your phone 💚",
+    arLoading: "Waking up the AI… ✨ (first time only)",
+    arUnavailable: "AR isn't supported on this device — every filter still works! 🌷",
     retakeOne: "One more try — you got this! 🌟",
     demoTitle: "Demo mode — pretend you look adorable (you do)",
     cameraError:
@@ -464,6 +479,17 @@ const th: Dict = {
     "cozy-glow": "โคซี่โกลว์",
     "anime-style": "สไตล์อนิเมะ"
   },
+  arFilters: {
+    none: "ปิด",
+    bunny: "กระต่าย",
+    cat: "แมว",
+    puppy: "หมา",
+    crown: "มงกุฎ",
+    glasses: "แว่น",
+    hearts: "ตาหัวใจ",
+    flower: "มงกุฎดอกไม้",
+    sparkle: "ประกาย"
+  },
   frames: {
     cream: "ครีม",
     pink: "ชมพูเบบี้",
@@ -511,6 +537,10 @@ const th: Dict = {
     beautySoft: "เนียน",
     beautyMax: "เนียนใสสุดๆ",
     beautyHint: "เกลี่ยเฉพาะผิว — ตา ปาก ผมยังคมชัด เห็นผลในรูปที่ถ่ายเลย!",
+    arTitle: "🪄 AR หน้า",
+    arHint: "ฟิลเตอร์ AI ติดหน้าทำงานบนเครื่อง — ไม่มีการส่งข้อมูลออกไปไหน 💚",
+    arLoading: "กำลังปลุก AI… ✨ (ครั้งแรกครั้งเดียว)",
+    arUnavailable: "เครื่องนี้ใช้ AR ไม่ได้ — แต่ฟิลเตอร์อื่นใช้ได้ครบนะ! 🌷",
     retakeOne: "อีกครั้งเดียว — สู้ๆ นะ! 🌟",
     demoTitle: "โหมดทดลอง — ทำเป็นว่าคุณน่ารักมาก (ซึ่งจริง)",
     cameraError:

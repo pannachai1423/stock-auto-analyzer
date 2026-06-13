@@ -19,6 +19,9 @@ import {
   type StripGeometry
 } from "@/lib/strip";
 import type { BeautyLevel } from "@/lib/beauty";
+import { AR_FILTERS, drawArFilter, type ArFilterId } from "@/lib/arFilters";
+import { getFaceLandmarker, detectFace, type FaceLandmarks } from "@/lib/faceTracker";
+import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 import { composeGif } from "@/lib/gif";
 import { shareImage } from "@/lib/share";
 import { sfx, isMuted, setMuted } from "@/lib/sounds";
@@ -278,15 +281,73 @@ export default function PhotoboothFlow() {
   const [muted, setMutedState] = useState(false);
   const [gifBusy, setGifBusy] = useState(false);
   const [beauty, setBeauty] = useState<BeautyLevel>(1);
+  const [arFilter, setArFilter] = useState<ArFilterId>("none");
+  const [arStatus, setArStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const triedFilters = useRef<Set<FilterId>>(new Set());
+  const landmarkerRef = useRef<FaceLandmarker | null>(null);
+  const latestFaceRef = useRef<FaceLandmarks | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMutedState(isMuted());
   }, []);
+
+  // load the on-device face model the first time an AR filter is chosen
+  useEffect(() => {
+    if (arFilter === "none" || landmarkerRef.current || arStatus === "unavailable") return;
+    let cancelled = false;
+    setArStatus("loading");
+    getFaceLandmarker().then((lm) => {
+      if (cancelled) return;
+      landmarkerRef.current = lm;
+      setArStatus(lm ? "ready" : "unavailable");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [arFilter, arStatus]);
+
+  // real-time face tracking + AR overlay while the camera is live
+  useEffect(() => {
+    const active =
+      stage === "capture" && !demoMode && arFilter !== "none" && arStatus === "ready";
+    if (!active) {
+      const c = overlayRef.current?.getContext("2d");
+      if (c && overlayRef.current) c.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height);
+      return;
+    }
+    let stop = false;
+    const loop = () => {
+      if (stop) return;
+      const video = videoRef.current;
+      const canvas = overlayRef.current;
+      const lm = landmarkerRef.current;
+      if (video && canvas && lm && video.videoWidth) {
+        if (canvas.width !== video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+        const face = detectFace(lm, video, performance.now());
+        latestFaceRef.current = face;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (face) drawArFilter(ctx, face, canvas.width, canvas.height, arFilter);
+        }
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => {
+      stop = true;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [stage, demoMode, arFilter, arStatus]);
 
   const layout = LAYOUTS.find((l) => l.id === layoutId) ?? LAYOUTS[0];
   const layoutLabel = (id: string) =>
@@ -339,8 +400,14 @@ export default function PhotoboothFlow() {
     if (demoMode || !videoRef.current || !streamRef.current) {
       return demoFrame(Math.floor(Math.random() * 8));
     }
-    return captureFrame(videoRef.current, mirrored, beauty);
-  }, [demoMode, mirrored, beauty]);
+    const face = latestFaceRef.current;
+    const bakeAr =
+      arFilter !== "none" && arStatus === "ready" && face
+        ? (ctx: CanvasRenderingContext2D, w: number, h: number) =>
+            drawArFilter(ctx, face, w, h, arFilter)
+        : undefined;
+    return captureFrame(videoRef.current, mirrored, beauty, bakeAr);
+  }, [demoMode, mirrored, beauty, arFilter, arStatus]);
 
   const runCountdown = useCallback(
     () =>
@@ -797,6 +864,12 @@ export default function PhotoboothFlow() {
                   </div>
                 )}
                 <FxOverlay fx={filterInfo.fx} />
+                <canvas
+                  ref={overlayRef}
+                  className={`pointer-events-none absolute inset-0 h-full w-full object-cover ${
+                    mirrored ? "-scale-x-100" : ""
+                  }`}
+                />
 
                 {cameraError && !demoMode && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-cream-100/95 p-6 text-center">
@@ -870,6 +943,34 @@ export default function PhotoboothFlow() {
                   {t.booth.beautyHint}
                 </span>
               </div>
+
+              {/* AI AR face filters (on-device, no upload) */}
+              {!demoMode && (
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                  <span className="font-display text-sm text-cocoa">{t.booth.arTitle}</span>
+                  {AR_FILTERS.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setArFilter(a.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                        arFilter === a.id
+                          ? "border-lav-400 bg-lav-100 text-[#71619e] shadow-plush scale-105"
+                          : "border-white/70 bg-white/60 hover:bg-white/90"
+                      }`}
+                    >
+                      {a.emoji} {t.arFilters[a.id]}
+                    </button>
+                  ))}
+                  <span className="w-full text-center text-[11px] text-cocoaSoft">
+                    {arFilter !== "none" && arStatus === "loading"
+                      ? t.booth.arLoading
+                      : arStatus === "unavailable"
+                        ? t.booth.arUnavailable
+                        : t.booth.arHint}
+                  </span>
+                </div>
+              )}
+
               <p className="mt-2 text-center">
                 <span className="chip text-xs">🖼️ {t.frames[frame]}</span>
               </p>
