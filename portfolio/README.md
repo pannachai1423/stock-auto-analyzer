@@ -1,19 +1,44 @@
-# Portfolio
+# securify — Portfolio Hero
 
-เว็บพอร์ตโฟลิโอส่วนตัวของปัณณชัย ลางคุณเสน (AI Content Creator & Creative)
+เว็บพอร์ตโฟลิโอ ดีไซน์แบบ full-screen hero section ("securify") สร้างด้วย
+**React + TypeScript + Tailwind CSS (Vite)**
 
-โฟลเดอร์นี้แยกเก็บไฟล์เว็บพอร์ตโฟลิโอไว้ต่างหาก ไม่ปนกับโปรเจกต์อื่น (เช่น stock-auto-analyzer)
+โฟลเดอร์นี้แยกเก็บไว้ต่างหาก ไม่ปนกับโปรเจกต์อื่น (เช่น stock-auto-analyzer)
 
-## ไฟล์
+## ฟีเจอร์
 
-- `Portfolio.html` — ไฟล์เว็บแบบ single-page HTML (รวม CSS/JS/รูปภาพแบบฝังในไฟล์เดียว)
+- พื้นหลังวิดีโอเต็มจอวนลูป (`object-cover`, autoplay/muted/loop)
+- Navbar ลอยทรงแคปซูล (pill) — โลโก้ + ลิงก์เมนู + ปุ่ม get started
+- ตัวอักษรหัวเรื่องขนาดใหญ่จัดวางแบบ staggered (`protect` / `your` / `data`)
+- บล็อกสถิติ 3 มุม พร้อมเส้นแบ่งเอียง และ gradient overlay ด้านล่าง
+- พาเลตต์ขาว-ดำล้วน (black / white / neutral-900 + white opacity) รองรับมือถือ
 
-## วิธีเปิด
-
-เปิดไฟล์ `Portfolio.html` ด้วยเบราว์เซอร์ได้เลย หรือเสิร์ฟด้วยเซิร์ฟเวอร์ static:
+## วิธีรัน
 
 ```bash
 cd portfolio
-python3 -m http.server 8000
-# แล้วเปิด http://localhost:8000/Portfolio.html
+npm install
+npm run dev      # เปิด http://localhost:5173
+```
+
+build สำหรับ production:
+
+```bash
+npm run build
+npm run preview
+```
+
+## โครงสร้าง
+
+```
+portfolio/
+  index.html              # โหลดฟอนต์ Readex Pro + mount React
+  src/
+    main.tsx              # entry point
+    App.tsx
+    index.css            # Tailwind + global styles + .hero-title
+    components/Hero.tsx   # hero section + navbar
+  tailwind.config.ts
+  vite.config.ts
+  legacy/Portfolio.html   # เว็บพอร์ตเวอร์ชันเดิม (เก็บไว้อ้างอิง)
 ```
